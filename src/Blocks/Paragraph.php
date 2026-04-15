@@ -20,6 +20,12 @@ class Paragraph implements BlockInterface
     /** @var int|null */
     protected ?int $listLevel = null;
 
+    /** @var string|null */
+    protected ?string $marker = null;
+
+    /** @var bool */
+    protected bool $isBullet = false;
+
     public function __construct(string $text, string $xml = '')
     {
         $this->text = $text;
@@ -32,6 +38,14 @@ class Paragraph implements BlockInterface
     public function isList(): bool
     {
         return $this->listId !== null;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isBullet(): bool
+    {
+        return $this->isBullet;
     }
 
     /**
@@ -48,6 +62,30 @@ class Paragraph implements BlockInterface
     public function listLevel(): ?int
     {
         return $this->listLevel;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getMarker(): ?string
+    {
+        return $this->marker;
+    }
+
+    /**
+     * @param string|null $marker
+     */
+    public function setMarker(?string $marker): void
+    {
+        $this->marker = $marker;
+    }
+
+    /**
+     * @param bool $isBullet
+     */
+    public function setIsBullet(bool $isBullet): void
+    {
+        $this->isBullet = $isBullet;
     }
 
     /**
@@ -69,6 +107,46 @@ class Paragraph implements BlockInterface
     public function getType(): string
     {
         return 'paragraph';
+    }
+
+    /**
+     * @param string $tag
+     * @return string
+     */
+    public function getHtml(string $tag = 'p'): string
+    {
+        $html = '';
+        foreach ($this->elements() as $element) {
+            if ($element instanceof \Avadim\FastDocxReader\Blocks\Elements\Text) {
+                $html .= $element->getHtml('');
+            } else {
+                $html .= htmlspecialchars($element->getText());
+            }
+        }
+        if ($tag) {
+            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
+        }
+        return $html;
+    }
+
+    /**
+     * @param string $tag
+     * @return string
+     */
+    public function getHtmlText(string $tag = ''): string
+    {
+        $html = '';
+        foreach ($this->elements() as $element) {
+            if ($element instanceof \Avadim\FastDocxReader\Blocks\Elements\Text) {
+                $html .= $element->getHtml('');
+            } else {
+                $html .= htmlspecialchars($element->getText());
+            }
+        }
+        if ($tag) {
+            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
+        }
+        return $html;
     }
 
     /**

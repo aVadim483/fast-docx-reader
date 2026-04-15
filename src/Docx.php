@@ -6,6 +6,7 @@ use Avadim\FastDocxReader\Blocks\BlockInterface;
 use Avadim\FastDocxReader\Blocks\ParagraphList;
 use Avadim\FastDocxReader\Blocks\Paragraph;
 use Avadim\FastDocxReader\Blocks\Table;
+use Avadim\FastDocxReader\NumberingMap;
 use XMLReader;
 use ZipArchive;
 use Exception;
@@ -17,6 +18,9 @@ class Docx
 
     /** @var ZipArchive */
     protected $zip;
+
+    /** @var NumberingMap|null */
+    protected ?NumberingMap $numberingMap = null;
 
     /**
      * @param string $filePath
@@ -31,6 +35,10 @@ class Docx
         $this->zip = new ZipArchive();
         if ($this->zip->open($filePath) !== true) {
             throw new Exception("Could not open ZIP: $filePath");
+        }
+        $numberingXml = $this->zip->getFromName('word/numbering.xml');
+        if ($numberingXml) {
+            $this->numberingMap = new NumberingMap($numberingXml);
         }
     }
 
@@ -60,6 +68,8 @@ class Docx
 
         /** @var ParagraphList|null $list */
         $list = null;
+        $lists = [];
+        $lastItem = null;
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT) {
                 if ($xmlReader->name === 'w:p') {
@@ -67,21 +77,55 @@ class Docx
                     $paragraph = new Paragraph($this->parseParagraphText($nodeXml), $nodeXml);
                     if ($listParams = $this->getListParams($nodeXml)) {
                         $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
+                        if ($this->numberingMap) {
+                            $paragraph->setMarker($this->numberingMap->getMarker($listParams['numId'], $listParams['ilvl']));
+                            $paragraph->setIsBullet($this->numberingMap->isBullet($listParams['numId'], $listParams['ilvl']));
+                        }
                         if (!$list) {
                             $list = new ParagraphList();
+                            $lists = [$listParams['ilvl'] => $list];
+                        } else {
+                            if ($listParams['numId'] !== $lastItem->listId()) {
+                                yield reset($lists);
+                                $list = new ParagraphList();
+                                $lists = [$listParams['ilvl'] => $list];
+                            } elseif ($listParams['ilvl'] > $lastItem->listLevel()) {
+                                $parentList = $list;
+                                $list = new ParagraphList();
+                                $parentList->addItem($list);
+                                $lists[$listParams['ilvl']] = $list;
+                            } elseif ($listParams['ilvl'] < $lastItem->listLevel()) {
+                                if (isset($lists[$listParams['ilvl']])) {
+                                    $list = $lists[$listParams['ilvl']];
+                                    // Remove deeper levels from tracking
+                                    foreach ($lists as $level => $l) {
+                                        if ($level > $listParams['ilvl']) {
+                                            unset($lists[$level]);
+                                        }
+                                    }
+                                } else {
+                                    // if level not found, just use the first one
+                                    $list = reset($lists);
+                                    // and reset lists to only this level
+                                    $lists = [$listParams['ilvl'] => $list];
+                                }
+                            }
                         }
                         $list->addItem($paragraph);
+                        $lastItem = $paragraph;
                     } else {
                         if ($list) {
-                            yield $list;
+                            yield reset($lists);
                             $list = null;
+                            $lists = [];
                         }
                         yield $paragraph;
                     }
                 } elseif ($xmlReader->name === 'w:tbl') {
                     if ($list) {
-                        yield $list;
+                        yield reset($lists);
                         $list = null;
+                        $lists = [];
                     }
                     $nodeXml = $xmlReader->readOuterXml();
                     yield new Table($this->parseTableRows($nodeXml));
@@ -89,7 +133,7 @@ class Docx
             }
         }
         if ($list) {
-            yield $list;
+            yield reset($lists);
         }
         $xmlReader->close();
     }

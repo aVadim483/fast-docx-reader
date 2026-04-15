@@ -79,9 +79,10 @@ class Text implements ElementInterface
     }
 
     /**
+     * @param string $tag
      * @return string
      */
-    public function getHtml($tag = 'span'): string
+    public function getHtml(string $tag = 'span'): string
     {
         $styles = [];
         if (!empty($this->style['b']) || !empty($this->style['bCs'])) {
@@ -111,6 +112,14 @@ class Text implements ElementInterface
             $html = htmlspecialchars($this->text);
         }
 
-        return '<' . $tag . $styleStr . '>' . $html . '</' . $tag . '>';
+        if ($tag) {
+            return '<' . $tag . $styleStr . '>' . $html . '</' . $tag . '>';
+        }
+
+        if ($styleStr) {
+            return '<span' . $styleStr . '>' . $html . '</span>';
+        }
+
+        return $html;
     }
 }

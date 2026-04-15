@@ -2,22 +2,27 @@
 
 namespace Avadim\FastDocxReader\Blocks;
 
-class ParagraphList implements BlockInterface
+class ParagraphList extends Paragraph
 {
-    /** @var Paragraph[] */
+    /** @var Paragraph[]|ParagraphList[] */
     protected array $items = [];
 
+    public function __construct(string $text = '', string $xml = '')
+    {
+        parent::__construct($text, $xml);
+    }
+
     /**
-     * @param Paragraph $paragraph
+     * @param Paragraph|ParagraphList $paragraph
      * @return void
      */
-    public function addItem(Paragraph $paragraph): void
+    public function addItem($paragraph): void
     {
         $this->items[] = $paragraph;
     }
 
     /**
-     * @return Paragraph[]
+     * @return Paragraph[]|ParagraphList[]
      */
     public function getItems(): array
     {
@@ -28,7 +33,16 @@ class ParagraphList implements BlockInterface
     {
         $text = '';
         foreach ($this->items as $item) {
-            $text .= $item->getText() . "\n";
+            if ($item instanceof ParagraphList) {
+                $text .= "\t" . str_replace("\n", "\n\t", trim($item->getText())) . "\n";
+            } else {
+                $marker = $item->getMarker();
+                if ($marker !== null) {
+                    $text .= $marker . ' ' . $item->getText() . "\n";
+                } else {
+                    $text .= $item->getText() . "\n";
+                }
+            }
         }
         return $text;
     }
@@ -36,5 +50,46 @@ class ParagraphList implements BlockInterface
     public function getType(): string
     {
         return 'list';
+    }
+
+    /**
+     * @param string $tag
+     * @return string
+     */
+    public function getHtml(string $tag = ''): string
+    {
+        $listTag = $this->isBullet() ? 'ul' : 'ol';
+        $html = '<' . $listTag . '>';
+        foreach ($this->items as $item) {
+            if ($item instanceof ParagraphList) {
+                $html .= $item->getHtml();
+            } else {
+                $html .= '<li>' . $item->getHtmlText() . '</li>';
+            }
+        }
+        $html .= '</' . $listTag . '>';
+        if ($tag) {
+            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
+        }
+        return $html;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isList(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isBullet(): bool
+    {
+        foreach ($this->items as $item) {
+            return $item->isBullet();
+        }
+        return false;
     }
 }
