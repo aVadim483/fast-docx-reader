@@ -18,7 +18,11 @@ class Table implements BlockInterface
         foreach ($this->rows as $row) {
             $rowText = [];
             foreach ($row as $cell) {
-                $rowText[] = $cell;
+                if ($cell instanceof BlockInterface) {
+                    $rowText[] = $cell->getText();
+                } else {
+                    $rowText[] = (string)$cell;
+                }
             }
             $text .= implode("\t", $rowText) . "\n";
         }

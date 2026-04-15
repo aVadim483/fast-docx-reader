@@ -68,11 +68,12 @@ class Docx
         $list = null;
         $lists = [];
         $lastItem = null;
+
         while ($this->xmlReader->read()) {
             if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
                 if ($this->xmlReader->name === 'w:p') {
                     $nodeXml = $this->xmlReader->readOuterXml();
-                    $paragraph = new Paragraph($this->parseParagraphText($nodeXml), $nodeXml);
+                    $paragraph = new Paragraph($nodeXml);
                     if ($listParams = $this->getListParams($nodeXml)) {
                         $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
                         if ($this->numberingMap) {
@@ -134,6 +135,7 @@ class Docx
             yield reset($lists);
         }
         $this->xmlReader->close();
+        $this->xmlReader = null;
     }
 
     /**
@@ -175,29 +177,6 @@ class Docx
         return strpos($xml, '<w:numPr>') !== false;
     }
 
-    /**
-     * @param string $xml
-     * @return string
-     */
-    protected function parseParagraphText(string $xml): string
-    {
-        $text = '';
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT) {
-                if ($xmlReader->name === 'w:t') {
-                    $text .= $xmlReader->readString();
-                } elseif ($xmlReader->name === 'w:br' || $xmlReader->name === 'w:cr') {
-                    $text .= "\n";
-                } elseif ($xmlReader->name === 'w:tab') {
-                    $text .= "\t";
-                }
-            }
-        }
-        $xmlReader->close();
-        return $text;
-    }
 
     /**
      * @param string $xml
@@ -229,7 +208,7 @@ class Docx
         $xmlReader->XML($xml);
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:tc') {
-                $cells[] = $this->parseParagraphText($xmlReader->readOuterXml());
+                $cells[] = new Paragraph($xmlReader->readOuterXml());
                 $xmlReader->next();
             }
         }

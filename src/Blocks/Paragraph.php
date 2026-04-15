@@ -8,8 +8,8 @@ use XMLReader;
 
 class Paragraph implements BlockInterface
 {
-    /** @var string */
-    protected string $text;
+    /** @var string|null */
+    protected ?string $text = null;
 
     /** @var string */
     protected string $xml;
@@ -26,9 +26,8 @@ class Paragraph implements BlockInterface
     /** @var bool */
     protected bool $isBullet = false;
 
-    public function __construct(string $text, string $xml = '')
+    public function __construct(string $xml = '')
     {
-        $this->text = $text;
         $this->xml = $xml;
     }
 
@@ -101,6 +100,13 @@ class Paragraph implements BlockInterface
 
     public function getText(): string
     {
+        if ($this->text === null) {
+            $this->text = '';
+            foreach ($this->elements() as $element) {
+                $this->text .= $element->getText();
+            }
+        }
+
         return $this->text;
     }
 
