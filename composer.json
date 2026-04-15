@@ -1,0 +1,20 @@
+{
+  "name": "avadim/fast-docx-reader",
+  "description": "Fast DOCX reader skeleton with streaming-oriented architecture",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Avadim\\FastDocxReader\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=7.4",
+    "ext-zip": "*",
+    "ext-xml": "*",
+    "ext-xmlreader": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6"
+  }
+}
