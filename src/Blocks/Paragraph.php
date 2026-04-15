@@ -14,10 +14,51 @@ class Paragraph implements BlockInterface
     /** @var string */
     protected string $xml;
 
+    /** @var int|null */
+    protected ?int $listId = null;
+
+    /** @var int|null */
+    protected ?int $listLevel = null;
+
     public function __construct(string $text, string $xml = '')
     {
         $this->text = $text;
         $this->xml = $xml;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isList(): bool
+    {
+        return $this->listId !== null;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function listId(): ?int
+    {
+        return $this->listId;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function listLevel(): ?int
+    {
+        return $this->listLevel;
+    }
+
+    /**
+     * @param int|null $listId
+     * @param int|null $listLevel
+     * @return void
+     */
+    public function setListParams(?int $listId, ?int $listLevel): void
+    {
+        $this->listId = $listId;
+        $this->listLevel = $listLevel;
     }
 
     public function getText(): string

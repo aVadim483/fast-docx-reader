@@ -3,6 +3,7 @@
 namespace Avadim\FastDocxReader;
 
 use Avadim\FastDocxReader\Blocks\BlockInterface;
+use Avadim\FastDocxReader\Blocks\ParagraphList;
 use Avadim\FastDocxReader\Blocks\Paragraph;
 use Avadim\FastDocxReader\Blocks\Table;
 use XMLReader;
@@ -57,18 +58,79 @@ class Docx
         $xmlReader = new XMLReader();
         $xmlReader->XML($documentXml);
 
+        /** @var ParagraphList|null $list */
+        $list = null;
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT) {
                 if ($xmlReader->name === 'w:p') {
                     $nodeXml = $xmlReader->readOuterXml();
-                    yield new Paragraph($this->parseParagraphText($nodeXml), $nodeXml);
+                    $paragraph = new Paragraph($this->parseParagraphText($nodeXml), $nodeXml);
+                    if ($listParams = $this->getListParams($nodeXml)) {
+                        $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
+                        if (!$list) {
+                            $list = new ParagraphList();
+                        }
+                        $list->addItem($paragraph);
+                    } else {
+                        if ($list) {
+                            yield $list;
+                            $list = null;
+                        }
+                        yield $paragraph;
+                    }
                 } elseif ($xmlReader->name === 'w:tbl') {
+                    if ($list) {
+                        yield $list;
+                        $list = null;
+                    }
                     $nodeXml = $xmlReader->readOuterXml();
                     yield new Table($this->parseTableRows($nodeXml));
                 }
             }
         }
+        if ($list) {
+            yield $list;
+        }
         $xmlReader->close();
+    }
+
+    /**
+     * @param string $xml
+     * @return array|null
+     */
+    protected function getListParams(string $xml): ?array
+    {
+        if (strpos($xml, '<w:numPr>') !== false) {
+            $xmlReader = new XMLReader();
+            $xmlReader->XML($xml);
+            $ilvl = 0;
+            $numId = null;
+            while ($xmlReader->read()) {
+                if ($xmlReader->nodeType === XMLReader::ELEMENT) {
+                    if ($xmlReader->name === 'w:ilvl') {
+                        $ilvl = (int)$xmlReader->getAttribute('w:val');
+                    } elseif ($xmlReader->name === 'w:numId') {
+                        $numId = (int)$xmlReader->getAttribute('w:val');
+                    }
+                }
+            }
+            $xmlReader->close();
+            if ($numId !== null) {
+                return ['ilvl' => $ilvl, 'numId' => $numId];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $xml
+     * @return bool
+     * @deprecated Use getListParams()
+     */
+    protected function isListItem(string $xml): bool
+    {
+        return strpos($xml, '<w:numPr>') !== false;
     }
 
     /**
