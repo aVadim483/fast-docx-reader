@@ -14,31 +14,37 @@ use Exception;
 class Docx
 {
     /** @var string */
-    protected $filePath;
+    protected string $file;
 
-    /** @var ZipArchive */
-    protected $zip;
+    /** @var Reader|null */
+    protected ?Reader $xmlReader;
 
     /** @var NumberingMap|null */
     protected ?NumberingMap $numberingMap = null;
 
     /**
-     * @param string $filePath
+     * @param string $file
      * @throws Exception
      */
-    public function __construct(string $filePath)
+    public function __construct(string $file)
     {
-        if (!file_exists($filePath)) {
-            throw new Exception("File not found: $filePath");
+        if (!file_exists($file)) {
+            throw new Exception("File not found: $file");
         }
-        $this->filePath = $filePath;
-        $this->zip = new ZipArchive();
-        if ($this->zip->open($filePath) !== true) {
-            throw new Exception("Could not open ZIP: $filePath");
-        }
-        $numberingXml = $this->zip->getFromName('word/numbering.xml');
-        if ($numberingXml) {
-            $this->numberingMap = new NumberingMap($numberingXml);
+        $this->file = $file;
+
+        $this->numberingMap = new NumberingMap($file);
+
+        $this->xmlReader = new Reader($file);
+        $this->xmlReader->openZip('word/document.xml');
+    }
+
+
+    public function __destruct()
+    {
+        if ($this->xmlReader) {
+            $this->xmlReader->close();
+            $this->xmlReader = null;
         }
     }
 
@@ -58,22 +64,14 @@ class Docx
      */
     public function blocks(): iterable
     {
-        $documentXml = $this->zip->getFromName('word/document.xml');
-        if (!$documentXml) {
-            throw new Exception("Could not find word/document.xml in DOCX");
-        }
-
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($documentXml);
-
         /** @var ParagraphList|null $list */
         $list = null;
         $lists = [];
         $lastItem = null;
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT) {
-                if ($xmlReader->name === 'w:p') {
-                    $nodeXml = $xmlReader->readOuterXml();
+        while ($this->xmlReader->read()) {
+            if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                if ($this->xmlReader->name === 'w:p') {
+                    $nodeXml = $this->xmlReader->readOuterXml();
                     $paragraph = new Paragraph($this->parseParagraphText($nodeXml), $nodeXml);
                     if ($listParams = $this->getListParams($nodeXml)) {
                         $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
@@ -121,13 +119,13 @@ class Docx
                         }
                         yield $paragraph;
                     }
-                } elseif ($xmlReader->name === 'w:tbl') {
+                } elseif ($this->xmlReader->name === 'w:tbl') {
                     if ($list) {
                         yield reset($lists);
                         $list = null;
                         $lists = [];
                     }
-                    $nodeXml = $xmlReader->readOuterXml();
+                    $nodeXml = $this->xmlReader->readOuterXml();
                     yield new Table($this->parseTableRows($nodeXml));
                 }
             }
@@ -135,7 +133,7 @@ class Docx
         if ($list) {
             yield reset($lists);
         }
-        $xmlReader->close();
+        $this->xmlReader->close();
     }
 
     /**
@@ -253,10 +251,4 @@ class Docx
         return trim($fullText);
     }
 
-    public function __destruct()
-    {
-        if ($this->zip) {
-            $this->zip->close();
-        }
-    }
 }

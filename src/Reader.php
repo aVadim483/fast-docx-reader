@@ -2,79 +2,217 @@
 
 namespace Avadim\FastDocxReader;
 
-use Avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use Avadim\FastDocxReader\Blocks\Elements\Image;
-use Avadim\FastDocxReader\Blocks\Elements\Text;
-use XMLReader;
-
-class Reader
+class Reader extends \XMLReader
 {
+    protected bool $alterMode = false;
+
+    protected string $docxFile;
+
+    protected ?string $innerFile = null;
+
+    protected ?\ZipArchive $zip;
+
+    protected array $xmlParserProperties = [];
+
+    /** @var string[] */
+    protected array $tmpFiles = [];
+
+    /** @var string|null */
+    protected static string $tempDir = '';
+
+
     /**
-     * @param string $xml
-     * @return ElementInterface|null
+     * @param string $file
+     * @param array|null $parserProperties
      */
-    public static function parseRun(string $xml): ?ElementInterface
+    public function __construct(string $file, ?array $parserProperties = [])
     {
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
+        $this->docxFile = $file;
+        $this->zip = new \ZipArchive();
+        if ($parserProperties) {
+            $this->xmlParserProperties = $parserProperties;
+        }
+    }
 
-        $text = '';
-        $style = [];
-        $isImage = false;
-        $isBreak = false;
-        $isTab = false;
 
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT) {
-                if ($xmlReader->name === 'w:t') {
-                    $text .= $xmlReader->readString();
-                } elseif ($xmlReader->name === 'w:br' || $xmlReader->name === 'w:cr') {
-                    $text .= "\n";
-                    $isBreak = true;
-                } elseif ($xmlReader->name === 'w:tab') {
-                    $text .= "\t";
-                    $isTab = true;
-                } elseif ($xmlReader->name === 'w:drawing' || $xmlReader->name === 'w:pict') {
-                    $isImage = true;
-                } elseif ($xmlReader->name === 'w:rPr') {
-                    $depth = $xmlReader->depth;
-                    while ($xmlReader->read() && $xmlReader->depth > $depth) {
-                        if ($xmlReader->nodeType === XMLReader::ELEMENT) {
-                            $styleName = str_replace('w:', '', $xmlReader->name);
-                            $styleValue = true;
-                            if ($xmlReader->hasAttributes) {
-                                $styleValue = [];
-                                while ($xmlReader->moveToNextAttribute()) {
-                                    $attrName = str_replace('w:', '', $xmlReader->name);
-                                    $styleValue[$attrName] = $xmlReader->value;
-                                }
-                                if (count($styleValue) === 1 && isset($styleValue['val'])) {
-                                    $styleValue = $styleValue['val'];
-                                }
-                                $xmlReader->moveToElement();
-                            }
-                            if (!$xmlReader->isEmptyElement) {
-                                $subDepth = $xmlReader->depth;
-                                while ($xmlReader->read() && $xmlReader->depth > $subDepth) {
-                                    // just skip
-                                }
-                            }
-                            $style[$styleName] = $styleValue;
-                        }
-                    }
+    public function __destruct()
+    {
+        $this->close();
+    }
+
+    /**
+     * @param string|null $tempDir
+     */
+    public static function setTempDir(?string $tempDir = '')
+    {
+        if ($tempDir) {
+            self::$tempDir = $tempDir;
+            if (!is_dir($tempDir)) {
+                $res = @mkdir($tempDir, 0755, true);
+                if (!$res) {
+                    throw new \Exception('Cannot create directory "' . $tempDir . '"');
+                }
+            }
+            self::$tempDir = realpath($tempDir);
+        }
+        else {
+            self::$tempDir = '';
+        }
+    }
+
+    /**
+     * @return bool|string
+     */
+    protected function makeTempFile()
+    {
+        $name = uniqid('xlsx_reader_', true);
+        if (!self::$tempDir) {
+            $tempDir = sys_get_temp_dir();
+            if (!is_writable($tempDir)) {
+                $tempDir = getcwd();
+            }
+        }
+        else {
+            $tempDir = self::$tempDir;
+        }
+        $filename = $tempDir . '/' . $name . '.tmp';
+        if (touch($filename, time(), time()) && is_writable($filename)) {
+            $filename = realpath($filename);
+            $this->tmpFiles[] = $filename;
+            return $filename;
+        }
+        else {
+            $error = 'Warning: tempdir ' . $tempDir . ' is not writeable';
+            if (!self::$tempDir) {
+                $error .= ', use ->setTempDir()';
+            }
+            throw new \Exception($error);
+        }
+    }
+
+    /**
+     * Open an inner file of the ZIP archive
+     *
+     * @param string $innerFile
+     * @param string|null $encoding
+     * @param int|null $options
+     *
+     * @return bool
+     */
+    public function openZip(string $innerFile, ?string $encoding = null, ?int $options = null): bool
+    {
+        if ($options === null) {
+            $options = 0;
+            if (defined('LIBXML_NONET')) {
+                $options = $options | LIBXML_NONET;
+            }
+            if (defined('LIBXML_COMPACT')) {
+                $options = $options | LIBXML_COMPACT;
+            }
+        }
+        $result = (!$this->alterMode) && $this->openXmlWrapper($innerFile, $encoding, $options);
+        if (!$result) {
+            $result = $this->openXmlStream($innerFile, $encoding, $options);
+            $this->alterMode = $result;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param string $innerFile
+     * @param string|null $encoding
+     * @param int|null $options
+     *
+     * @return bool
+     */
+    protected function openXmlWrapper(string $innerFile, ?string $encoding = null, ?int $options = 0): bool
+    {
+        $this->innerFile = $innerFile;
+        $result = @$this->open('zip://' . $this->docxFile . '#' . $innerFile, $encoding, $options);
+        if ($result) {
+            foreach ($this->xmlParserProperties as $property => $value) {
+                $this->setParserProperty($property, $value);
+            }
+        }
+
+        return (bool)$result;
+    }
+
+    /**
+     * Opens the INTERNAL XML file from XLSX as XMLReader
+     * Example: openXml('xl/workbook.xml')
+     *
+     * @param string $innerPath
+     * @param string|null $encoding
+     * @param int|null $options
+     *
+     * @return bool
+     */
+    protected function openXmlStream(string $innerPath, ?string $encoding = null, ?int $options = 0): bool
+    {
+        $this->zip = new \ZipArchive();
+
+        if ($this->zip->open($this->docxFile) !== true) {
+            throw new \Exception('Failed to open archive: ' . $this->docxFile);
+        }
+
+        $st = $this->zip->getStream($innerPath);
+        if ($st === false) {
+            throw new \Exception("Internal file not found: {$innerPath}");
+        }
+
+        $tmp = $this->makeTempFile();
+        $out = fopen($tmp, 'wb');
+        if (!$out) {
+            fclose($st);
+            throw new \Exception("Failed to create temporary file: {$tmp}");
+        }
+
+        stream_copy_to_stream($st, $out);
+        fclose($st);
+        fclose($out);
+
+        if (!$this->open($tmp, $encoding, $options)) {
+            throw new \Exception("XMLReader::open() failed to open {$tmp}");
+        }
+
+        return true;
+    }
+
+    /**
+     * @return bool
+     */
+    #[\ReturnTypeWillChange]
+    public function close(): bool
+    {
+        $result = parent::close();
+        if ($result) {
+            if ($this->innerFile) {
+                $this->innerFile = null;
+            }
+            foreach ($this->tmpFiles as $tmp) {
+                if (is_file($tmp)) {
+                    @unlink($tmp);
                 }
             }
         }
-        $xmlReader->close();
 
-        if ($isImage) {
-            return new Image($style);
+        return $result;
+    }
+
+    /**
+     * @param string $tagName
+     *
+     * @return bool
+     */
+    public function seekOpenTag(string $tagName): bool
+    {
+        while ($this->read()) {
+            if ($this->nodeType === \XMLReader::ELEMENT && $this->name === $tagName) {
+                return true;
+            }
         }
-
-        if ($text !== '' || $isBreak || $isTab || !empty($style)) {
-            return new Text($text, $isBreak, $isTab, $style);
-        }
-
-        return null;
+        return false;
     }
 }

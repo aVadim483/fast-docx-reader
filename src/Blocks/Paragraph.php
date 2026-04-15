@@ -3,7 +3,7 @@
 namespace Avadim\FastDocxReader\Blocks;
 
 use Avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use Avadim\FastDocxReader\Reader;
+use Avadim\FastDocxReader\Parser;
 use XMLReader;
 
 class Paragraph implements BlockInterface
@@ -164,7 +164,7 @@ class Paragraph implements BlockInterface
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:r') {
                 $nodeXml = $xmlReader->readOuterXml();
-                $element = Reader::parseRun($nodeXml);
+                $element = Parser::parseRun($nodeXml);
                 if ($element) {
                     yield $element;
                 }

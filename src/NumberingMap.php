@@ -16,22 +16,21 @@ class NumberingMap
     protected array $counters = [];
 
     /**
-     * @param string $xml
+     * @param string $file
      */
-    public function __construct(string $xml)
+    public function __construct(string $file)
     {
-        $this->parse($xml);
+        $xmlReader = new Reader($file);
+        $xmlReader->openZip('word/numbering.xml');
+        $this->parse($xmlReader);
     }
 
     /**
-     * @param string $xml
+     * @param $xmlReader
      * @return void
      */
-    public function parse(string $xml): void
+    public function parse($xmlReader): void
     {
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
-
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT) {
                 if ($xmlReader->name === 'w:abstractNum') {
