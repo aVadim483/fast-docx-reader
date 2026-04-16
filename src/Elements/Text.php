@@ -1,6 +1,6 @@
 <?php
 
-namespace avadim\FastDocxReader\Blocks\Elements;
+namespace avadim\FastDocxReader\Elements;
 
 class Text implements ElementInterface
 {

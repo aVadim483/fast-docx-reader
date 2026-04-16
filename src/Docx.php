@@ -3,13 +3,14 @@
 namespace avadim\FastDocxReader;
 
 use avadim\FastDocxReader\Blocks\BlockInterface;
-use avadim\FastDocxReader\Blocks\ParagraphList;
 use avadim\FastDocxReader\Blocks\Paragraph;
+use avadim\FastDocxReader\Blocks\ParagraphList;
 use avadim\FastDocxReader\Blocks\Table;
-use avadim\FastDocxReader\NumberingMap;
+use avadim\FastDocxReader\Exception\Exception;
+use avadim\FastDocxReader\Reader\NumberingMap;
+use avadim\FastDocxReader\Reader\Parser;
+use avadim\FastDocxReader\Reader\Reader;
 use XMLReader;
-use ZipArchive;
-use Exception;
 
 class Docx
 {
@@ -161,7 +162,14 @@ class Docx
      */
     protected function readParagraph(): Paragraph
     {
-        return new Paragraph($this->xmlReader->readOuterXml());
+        $xml = $this->xmlReader->readOuterXml();
+        $paragraph = new Paragraph($xml);
+        $style = Parser::parseAttributes($xml, 'w:pPr');
+        if ($style) {
+            $paragraph->setStyle($style);
+        }
+
+        return $paragraph;
     }
 
     /**
@@ -169,7 +177,25 @@ class Docx
      */
     protected function readTable(): Table
     {
-        return new Table($this->readTableRows());
+        $style = [];
+        $depth = $this->xmlReader->depth;
+        if ($this->xmlReader->name === 'w:tbl') {
+            while ($this->xmlReader->read() && $this->xmlReader->depth > $depth) {
+                if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                    if ($this->xmlReader->name === 'w:tblPr') {
+                        $style = Parser::parseAttributes($this->xmlReader->readOuterXml(), 'w:tblPr');
+                    } elseif ($this->xmlReader->name === 'w:tr') {
+                        // We found the first row, so we stop parsing properties and read all rows
+                        // But we need to be careful with XMLReader position.
+                        // readTableRows() starts with $this->xmlReader->read()
+                        // If we are already at w:tr, we should probably change how readTableRows works
+                        // or backtrack/handle it.
+                        break;
+                    }
+                }
+            }
+        }
+        return new Table($this->readTableRows(), $style);
     }
 
     /**
@@ -178,10 +204,17 @@ class Docx
     protected function readTableRows(): array
     {
         $rows = [];
+        // If we are already at w:tr, we need to process it
+        if ($this->xmlReader->nodeType === XMLReader::ELEMENT && $this->xmlReader->name === 'w:tr') {
+            $rows[] = $this->readRow();
+        }
         $depth = $this->xmlReader->depth;
-        while ($this->xmlReader->read() && $this->xmlReader->depth > $depth) {
+        while ($this->xmlReader->read() && $this->xmlReader->depth === $depth) {
             if ($this->xmlReader->nodeType === XMLReader::ELEMENT && $this->xmlReader->name === 'w:tr') {
                 $rows[] = $this->readRow();
+            }
+            if ($this->xmlReader->nodeType === XMLReader::END_ELEMENT && $this->xmlReader->name === 'w:tbl') {
+                break;
             }
         }
 
@@ -194,32 +227,40 @@ class Docx
     protected function readRow(): array
     {
         $cells = [];
+        $style = [];
         $depth = $this->xmlReader->depth;
         while ($this->xmlReader->read() && $this->xmlReader->depth > $depth) {
-            if ($this->xmlReader->nodeType === XMLReader::ELEMENT && $this->xmlReader->name === 'w:tc') {
-                $cellDepth = $this->xmlReader->depth;
-                $style = [];
-                $cellContent = [];
-                while ($this->xmlReader->read() && $this->xmlReader->depth > $cellDepth) {
-                    if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
-                        if ($this->xmlReader->name === 'w:tcPr') {
-                            $style = Parser::parseAttributes($this->xmlReader->readOuterXml(), 'w:tcPr');
-                        } elseif ($this->xmlReader->name === 'w:p' || $this->xmlReader->name === 'w:tbl') {
-                            $block = $this->readBlock();
-                            if ($block) {
-                                $cellContent[] = $block;
+            if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                if ($this->xmlReader->name === 'w:trPr') {
+                    $style = Parser::parseAttributes($this->xmlReader->readOuterXml(), 'w:trPr');
+                } elseif ($this->xmlReader->name === 'w:tc') {
+                    $cellDepth = $this->xmlReader->depth;
+                    $cellStyle = [];
+                    $cellContent = [];
+                    while ($this->xmlReader->read() && $this->xmlReader->depth > $cellDepth) {
+                        if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                            if ($this->xmlReader->name === 'w:tcPr') {
+                                $cellStyle = Parser::parseAttributes($this->xmlReader->readOuterXml(), 'w:tcPr');
+                            } elseif ($this->xmlReader->name === 'w:p' || $this->xmlReader->name === 'w:tbl') {
+                                $block = $this->readBlock();
+                                if ($block) {
+                                    $cellContent[] = $block;
+                                }
                             }
                         }
                     }
+                    $cells[] = [
+                        'style' => $cellStyle,
+                        'value' => $cellContent, //$this->composeCell($cellContent),
+                    ];
                 }
-                $cells[] = [
-                    'style' => $style,
-                    'value' => $cellContent, //$this->composeCell($cellContent),
-                ];
             }
         }
 
-        return $cells;
+        return [
+            'style' => $style,
+            'cells' => $cells,
+        ];
     }
 
     /**

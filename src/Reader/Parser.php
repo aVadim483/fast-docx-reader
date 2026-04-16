@@ -1,10 +1,10 @@
 <?php
 
-namespace avadim\FastDocxReader;
+namespace avadim\FastDocxReader\Reader;
 
-use avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use avadim\FastDocxReader\Blocks\Elements\Image;
-use avadim\FastDocxReader\Blocks\Elements\Text;
+use avadim\FastDocxReader\Elements\ElementInterface;
+use avadim\FastDocxReader\Elements\Image;
+use avadim\FastDocxReader\Elements\Text;
 use XMLReader;
 
 class Parser

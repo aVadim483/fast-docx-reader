@@ -7,9 +7,13 @@ class Table implements BlockInterface
     /** @var array */
     protected array $rows = [];
 
-    public function __construct(array $rows)
+    /** @var array */
+    protected array $style = [];
+
+    public function __construct(array $rows, array $style = [])
     {
         $this->rows = $rows;
+        $this->style = $style;
     }
 
     public function getText(): string
@@ -17,13 +21,24 @@ class Table implements BlockInterface
         $text = '';
         foreach ($this->rows as $row) {
             $rowText = [];
-            foreach ($row as $cell) {
+            $cells = is_array($row) && isset($row['cells']) ? $row['cells'] : $row;
+            foreach ($cells as $cell) {
                 if (is_array($cell) && isset($cell['value'])) {
                     $cellValue = $cell['value'];
                 } else {
                     $cellValue = $cell;
                 }
-                if ($cellValue instanceof BlockInterface) {
+                if (is_array($cellValue)) {
+                    $cellText = '';
+                    foreach ($cellValue as $value) {
+                        if ($value instanceof BlockInterface) {
+                            $cellText .= $value->getText();
+                        } else {
+                            $cellText .= (string)$value;
+                        }
+                    }
+                    $rowText[] = $cellText;
+                } elseif ($cellValue instanceof BlockInterface) {
                     $rowText[] = $cellValue->getText();
                 } else {
                     $rowText[] = (string)$cellValue;
@@ -55,12 +70,16 @@ class Table implements BlockInterface
      */
     public function getCell(int $rowNum, int $cellNum)
     {
-        if (isset($this->rows[$rowNum][$cellNum])) {
-            $cell = $this->rows[$rowNum][$cellNum];
-            if (is_array($cell) && isset($cell['value'])) {
-                return $cell['value'];
+        if (isset($this->rows[$rowNum])) {
+            $row = $this->rows[$rowNum];
+            $cells = is_array($row) && isset($row['cells']) ? $row['cells'] : $row;
+            if (isset($cells[$cellNum])) {
+                $cell = $cells[$cellNum];
+                if (is_array($cell) && isset($cell['value'])) {
+                    return $cell['value'];
+                }
+                return $cell;
             }
-            return $cell;
         }
 
         return null;
@@ -74,10 +93,14 @@ class Table implements BlockInterface
      */
     public function getCellStyle(int $rowNum, int $cellNum): ?array
     {
-        if (isset($this->rows[$rowNum][$cellNum])) {
-            $cell = $this->rows[$rowNum][$cellNum];
-            if (is_array($cell) && isset($cell['style'])) {
-                return $cell['style'];
+        if (isset($this->rows[$rowNum])) {
+            $row = $this->rows[$rowNum];
+            $cells = is_array($row) && isset($row['cells']) ? $row['cells'] : $row;
+            if (isset($cells[$cellNum])) {
+                $cell = $cells[$cellNum];
+                if (is_array($cell) && isset($cell['style'])) {
+                    return $cell['style'];
+                }
             }
         }
 
@@ -85,14 +108,55 @@ class Table implements BlockInterface
     }
 
     /**
+     * @return array
+     */
+    public function getStyle(): array
+    {
+        return $this->style;
+    }
+
+    /**
      * @return string
      */
     public function getHtml(): string
     {
-        $html = '<table style="border-collapse: collapse; border: 1px solid black;">';
+        $tableStyle = 'border-collapse: collapse;';
+        if (!empty($this->style['tblW']['w']) && !empty($this->style['tblW']['type'])) {
+            if ($this->style['tblW']['type'] === 'dxa') {
+                $tableStyle .= ' width: ' . ($this->style['tblW']['w'] / 20) . 'pt;';
+            } elseif ($this->style['tblW']['type'] === 'pct') {
+                $tableStyle .= ' width: ' . ($this->style['tblW']['w'] / 50) . '%;';
+            } elseif ($this->style['tblW']['type'] === 'auto') {
+                $tableStyle .= ' width: auto;';
+            }
+        }
+        if (!empty($this->style['tblBorders'])) {
+            foreach (['top', 'left', 'bottom', 'right', 'insideH', 'insideV'] as $side) {
+                if (isset($this->style['tblBorders'][$side])) {
+                    // We can handle some basic borders here if needed, 
+                    // but usually they are applied to cells
+                }
+            }
+        }
+
+        $html = '<table' . ($tableStyle ? ' style="' . trim($tableStyle) . '"' : '') . '>';
         foreach ($this->rows as $row) {
-            $html .= '<tr>';
-            foreach ($row as $cell) {
+            $rowStyle = [];
+            if (is_array($row) && isset($row['cells'])) {
+                $cells = $row['cells'];
+                $rowStyle = $row['style'] ?? [];
+            } else {
+                $cells = $row;
+            }
+
+            $trStyle = '';
+            $height = $rowStyle['trHeight']['val'] ?? ($rowStyle['trHeight'] ?? null);
+            if ($height) {
+                $trStyle .= ' height: ' . ($height / 20) . 'pt;';
+            }
+
+            $html .= '<tr' . ($trStyle ? ' style="' . trim($trStyle) . '"' : '') . '>';
+            foreach ($cells as $cell) {
                 if (is_array($cell) && isset($cell['value'])) {
                     $cellValues = $cell['value'];
                     $cellStyle = $cell['style'] ?? [];
@@ -138,18 +202,30 @@ class Table implements BlockInterface
                 }
 
                 $html .= '<td style="' . trim($tdStyle) . '">';
-                foreach ($cellValues as $cellValue) {
-                    if ($cellValue instanceof Paragraph) {
-                        $html .= $cellValue->getHtml();
-                    } elseif ($cellValue instanceof BlockInterface) {
-                        if (method_exists($cellValue, 'getHtml')) {
+                if (is_array($cellValues)) {
+                    foreach ($cellValues as $cellValue) {
+                        if ($cellValue instanceof Paragraph) {
                             $html .= $cellValue->getHtml();
+                        } elseif ($cellValue instanceof BlockInterface) {
+                            if (method_exists($cellValue, 'getHtml')) {
+                                $html .= $cellValue->getHtml();
+                            } else {
+                                $html .= htmlspecialchars($cellValue->getText());
+                            }
                         } else {
-                            $html .= htmlspecialchars($cellValue->getText());
+                            $html .= htmlspecialchars((string)$cellValue);
                         }
-                    } else {
-                        $html .= htmlspecialchars((string)$cellValue);
                     }
+                } elseif ($cellValues instanceof Paragraph) {
+                    $html .= $cellValues->getHtml();
+                } elseif ($cellValues instanceof BlockInterface) {
+                    if (method_exists($cellValues, 'getHtml')) {
+                        $html .= $cellValues->getHtml();
+                    } else {
+                        $html .= htmlspecialchars($cellValues->getText());
+                    }
+                } else {
+                    $html .= htmlspecialchars((string)$cellValues);
                 }
                 $html .= '</td>';
             }

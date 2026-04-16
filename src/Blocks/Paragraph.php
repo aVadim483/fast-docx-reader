@@ -2,8 +2,8 @@
 
 namespace avadim\FastDocxReader\Blocks;
 
-use avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use avadim\FastDocxReader\Parser;
+use avadim\FastDocxReader\Elements\ElementInterface;
+use avadim\FastDocxReader\Reader\Parser;
 use XMLReader;
 
 class Paragraph implements BlockInterface
@@ -25,6 +25,9 @@ class Paragraph implements BlockInterface
 
     /** @var bool */
     protected bool $isBullet = false;
+
+    /** @var array */
+    protected array $style = [];
 
     public function __construct(string $xml = '')
     {
@@ -98,6 +101,22 @@ class Paragraph implements BlockInterface
         $this->listLevel = $listLevel;
     }
 
+    /**
+     * @return array
+     */
+    public function getStyle(): array
+    {
+        return $this->style;
+    }
+
+    /**
+     * @param array $style
+     */
+    public function setStyle(array $style): void
+    {
+        $this->style = $style;
+    }
+
     public function getText(): string
     {
         if ($this->text === null) {
@@ -131,7 +150,15 @@ class Paragraph implements BlockInterface
     {
         $html = $this->getHtmlContents();
         if ($tag) {
-            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
+            $styleStr = '';
+            $styles = [];
+            if (!empty($this->style['jc'])) {
+                $styles[] = 'text-align:' . $this->style['jc'];
+            }
+            if ($styles) {
+                $styleStr = ' style="' . implode(';', $styles) . '"';
+            }
+            $html = '<' . $tag . $styleStr . '>' . $html . '</' . $tag . '>';
         }
 
         return $html;
@@ -144,7 +171,7 @@ class Paragraph implements BlockInterface
     {
         $html = '';
         foreach ($this->elements() as $element) {
-            if ($element instanceof \avadim\FastDocxReader\Blocks\Elements\Text) {
+            if ($element instanceof \avadim\FastDocxReader\Elements\Text) {
                 $html .= $element->getHtml('');
             } else {
                 $html .= htmlspecialchars($element->getText());

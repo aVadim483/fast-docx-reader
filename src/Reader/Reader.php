@@ -1,6 +1,8 @@
 <?php
 
-namespace avadim\FastDocxReader;
+namespace avadim\FastDocxReader\Reader;
+
+use avadim\FastDocxReader\Exception\Exception;
 
 class Reader extends \XMLReader
 {
@@ -50,7 +52,7 @@ class Reader extends \XMLReader
             if (!is_dir($tempDir)) {
                 $res = @mkdir($tempDir, 0755, true);
                 if (!$res) {
-                    throw new \Exception('Cannot create directory "' . $tempDir . '"');
+                    throw new Exception('Cannot create directory "' . $tempDir . '"');
                 }
             }
             self::$tempDir = realpath($tempDir);
@@ -86,7 +88,7 @@ class Reader extends \XMLReader
             if (!self::$tempDir) {
                 $error .= ', use ->setTempDir()';
             }
-            throw new \Exception($error);
+            throw new Exception($error);
         }
     }
 
@@ -154,19 +156,19 @@ class Reader extends \XMLReader
         $this->zip = new \ZipArchive();
 
         if ($this->zip->open($this->docxFile) !== true) {
-            throw new \Exception('Failed to open archive: ' . $this->docxFile);
+            throw new Exception('Failed to open archive: ' . $this->docxFile);
         }
 
         $st = $this->zip->getStream($innerPath);
         if ($st === false) {
-            throw new \Exception("Internal file not found: {$innerPath}");
+            throw new Exception("Internal file not found: {$innerPath}");
         }
 
         $tmp = $this->makeTempFile();
         $out = fopen($tmp, 'wb');
         if (!$out) {
             fclose($st);
-            throw new \Exception("Failed to create temporary file: {$tmp}");
+            throw new Exception("Failed to create temporary file: {$tmp}");
         }
 
         stream_copy_to_stream($st, $out);
@@ -174,7 +176,7 @@ class Reader extends \XMLReader
         fclose($out);
 
         if (!$this->open($tmp, $encoding, $options)) {
-            throw new \Exception("XMLReader::open() failed to open {$tmp}");
+            throw new Exception("XMLReader::open() failed to open {$tmp}");
         }
 
         return true;
