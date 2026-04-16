@@ -1,12 +1,12 @@
 <?php
 
-namespace Avadim\FastDocxReader;
+namespace avadim\FastDocxReader;
 
-use Avadim\FastDocxReader\Blocks\BlockInterface;
-use Avadim\FastDocxReader\Blocks\ParagraphList;
-use Avadim\FastDocxReader\Blocks\Paragraph;
-use Avadim\FastDocxReader\Blocks\Table;
-use Avadim\FastDocxReader\NumberingMap;
+use avadim\FastDocxReader\Blocks\BlockInterface;
+use avadim\FastDocxReader\Blocks\ParagraphList;
+use avadim\FastDocxReader\Blocks\Paragraph;
+use avadim\FastDocxReader\Blocks\Table;
+use avadim\FastDocxReader\NumberingMap;
 use XMLReader;
 use ZipArchive;
 use Exception;
@@ -71,14 +71,13 @@ class Docx
 
         while ($this->xmlReader->read()) {
             if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
-                if ($this->xmlReader->name === 'w:p') {
-                    $nodeXml = $this->xmlReader->readOuterXml();
-                    $paragraph = new Paragraph($nodeXml);
-                    if ($listParams = $this->getListParams($nodeXml)) {
-                        $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
+                $block = $this->readBlock();
+                if ($block) {
+                    if ($block instanceof Paragraph && $listParams = $this->getListParams($block->getXml())) {
+                        $block->setListParams($listParams['numId'], $listParams['ilvl']);
                         if ($this->numberingMap) {
-                            $paragraph->setMarker($this->numberingMap->getMarker($listParams['numId'], $listParams['ilvl']));
-                            $paragraph->setIsBullet($this->numberingMap->isBullet($listParams['numId'], $listParams['ilvl']));
+                            $block->setMarker($this->numberingMap->getMarker($listParams['numId'], $listParams['ilvl']));
+                            $block->setIsBullet($this->numberingMap->isBullet($listParams['numId'], $listParams['ilvl']));
                         }
                         if (!$list) {
                             $list = new ParagraphList();
@@ -110,24 +109,16 @@ class Docx
                                 }
                             }
                         }
-                        $list->addItem($paragraph);
-                        $lastItem = $paragraph;
+                        $list->addItem($block);
+                        $lastItem = $block;
                     } else {
                         if ($list) {
                             yield reset($lists);
                             $list = null;
                             $lists = [];
                         }
-                        yield $paragraph;
+                        yield $block;
                     }
-                } elseif ($this->xmlReader->name === 'w:tbl') {
-                    if ($list) {
-                        yield reset($lists);
-                        $list = null;
-                        $lists = [];
-                    }
-                    $nodeXml = $this->xmlReader->readOuterXml();
-                    yield new Table($this->parseTableRows($nodeXml));
                 }
             }
         }
@@ -139,6 +130,121 @@ class Docx
     }
 
     /**
+     * @return BlockInterface|null
+     */
+    protected function readBlock(): ?BlockInterface
+    {
+        if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+            if ($this->xmlReader->name === 'w:p') {
+                return $this->readParagraph();
+            }
+            if ($this->xmlReader->name === 'w:tbl') {
+                return $this->readTable();
+            }
+        }
+        while ($this->xmlReader->read()) {
+            if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                if ($this->xmlReader->name === 'w:p') {
+                    return $this->readParagraph();
+                }
+                if ($this->xmlReader->name === 'w:tbl') {
+                    return $this->readTable();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Paragraph
+     */
+    protected function readParagraph(): Paragraph
+    {
+        return new Paragraph($this->xmlReader->readOuterXml());
+    }
+
+    /**
+     * @return Table
+     */
+    protected function readTable(): Table
+    {
+        return new Table($this->readTableRows());
+    }
+
+    /**
+     * @return array
+     */
+    protected function readTableRows(): array
+    {
+        $rows = [];
+        $depth = $this->xmlReader->depth;
+        while ($this->xmlReader->read() && $this->xmlReader->depth > $depth) {
+            if ($this->xmlReader->nodeType === XMLReader::ELEMENT && $this->xmlReader->name === 'w:tr') {
+                $rows[] = $this->readRow();
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array
+     */
+    protected function readRow(): array
+    {
+        $cells = [];
+        $depth = $this->xmlReader->depth;
+        while ($this->xmlReader->read() && $this->xmlReader->depth > $depth) {
+            if ($this->xmlReader->nodeType === XMLReader::ELEMENT && $this->xmlReader->name === 'w:tc') {
+                $cellDepth = $this->xmlReader->depth;
+                $style = [];
+                $cellContent = [];
+                while ($this->xmlReader->read() && $this->xmlReader->depth > $cellDepth) {
+                    if ($this->xmlReader->nodeType === XMLReader::ELEMENT) {
+                        if ($this->xmlReader->name === 'w:tcPr') {
+                            $style = Parser::parseAttributes($this->xmlReader->readOuterXml(), 'w:tcPr');
+                        } elseif ($this->xmlReader->name === 'w:p' || $this->xmlReader->name === 'w:tbl') {
+                            $block = $this->readBlock();
+                            if ($block) {
+                                $cellContent[] = $block;
+                            }
+                        }
+                    }
+                }
+                $cells[] = [
+                    'style' => $style,
+                    'value' => $cellContent, //$this->composeCell($cellContent),
+                ];
+            }
+        }
+
+        return $cells;
+    }
+
+    /**
+     * @param array $cellContent
+     *
+     * @return BlockInterface
+     */
+    protected function composeCell(array $cellContent): BlockInterface
+    {
+        if (count($cellContent) === 1) {
+            return $cellContent[0];
+        }
+
+        $xml = '';
+        foreach ($cellContent as $block) {
+            if ($block instanceof Paragraph) {
+                $xml .= $block->getXml();
+            }
+        }
+
+        return new Paragraph($xml);
+    }
+
+
+    /**
      * @param string $xml
      * @return array|null
      */
@@ -146,7 +252,7 @@ class Docx
     {
         if (strpos($xml, '<w:numPr>') !== false) {
             $xmlReader = new XMLReader();
-            $xmlReader->XML($xml);
+            $xmlReader->XML('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' . $xml . '</root>');
             $ilvl = 0;
             $numId = null;
             while ($xmlReader->read()) {
@@ -177,44 +283,6 @@ class Docx
         return strpos($xml, '<w:numPr>') !== false;
     }
 
-
-    /**
-     * @param string $xml
-     * @return array
-     */
-    protected function parseTableRows(string $xml): array
-    {
-        $rows = [];
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:tr') {
-                $rows[] = $this->parseTableRow($xmlReader->readOuterXml());
-                $xmlReader->next();
-            }
-        }
-        $xmlReader->close();
-        return $rows;
-    }
-
-    /**
-     * @param string $xml
-     * @return array
-     */
-    protected function parseTableRow(string $xml): array
-    {
-        $cells = [];
-        $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:tc') {
-                $cells[] = new Paragraph($xmlReader->readOuterXml());
-                $xmlReader->next();
-            }
-        }
-        $xmlReader->close();
-        return $cells;
-    }
 
     /**
      * @param array $options

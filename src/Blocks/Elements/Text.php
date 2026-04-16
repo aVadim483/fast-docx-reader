@@ -1,6 +1,6 @@
 <?php
 
-namespace Avadim\FastDocxReader\Blocks\Elements;
+namespace avadim\FastDocxReader\Blocks\Elements;
 
 class Text implements ElementInterface
 {
@@ -94,8 +94,11 @@ class Text implements ElementInterface
         if (!empty($this->style['u'])) {
             $styles[] = 'text-decoration:underline';
         }
-        if (!empty($this->style['color'])) {
+        if (!empty($this->style['color']) && is_string($this->style['color'])) {
             $styles[] = 'color:#' . $this->style['color'];
+        }
+        elseif (!empty($this->style['color']['val']) && is_string($this->style['color']['val'])) {
+            $styles[] = 'color:#' . $this->style['color']['val'];
         }
         if (!empty($this->style['highlight'])) {
             $styles[] = 'background-color:' . $this->style['highlight'];

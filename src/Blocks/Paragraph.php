@@ -1,9 +1,9 @@
 <?php
 
-namespace Avadim\FastDocxReader\Blocks;
+namespace avadim\FastDocxReader\Blocks;
 
-use Avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use Avadim\FastDocxReader\Parser;
+use avadim\FastDocxReader\Blocks\Elements\ElementInterface;
+use avadim\FastDocxReader\Parser;
 use XMLReader;
 
 class Paragraph implements BlockInterface
@@ -116,42 +116,41 @@ class Paragraph implements BlockInterface
     }
 
     /**
-     * @param string $tag
      * @return string
      */
-    public function getHtml(string $tag = 'p'): string
+    public function getXml(): string
     {
-        $html = '';
-        foreach ($this->elements() as $element) {
-            if ($element instanceof \Avadim\FastDocxReader\Blocks\Elements\Text) {
-                $html .= $element->getHtml('');
-            } else {
-                $html .= htmlspecialchars($element->getText());
-            }
-        }
-        if ($tag) {
-            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
-        }
-        return $html;
+        return $this->xml;
     }
 
     /**
      * @param string $tag
      * @return string
      */
-    public function getHtmlText(string $tag = ''): string
+    public function getHtml(string $tag = 'p'): string
+    {
+        $html = $this->getHtmlContents();
+        if ($tag) {
+            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
+        }
+
+        return $html;
+    }
+
+    /**
+     * @return string
+     */
+    public function getHtmlContents(): string
     {
         $html = '';
         foreach ($this->elements() as $element) {
-            if ($element instanceof \Avadim\FastDocxReader\Blocks\Elements\Text) {
+            if ($element instanceof \avadim\FastDocxReader\Blocks\Elements\Text) {
                 $html .= $element->getHtml('');
             } else {
                 $html .= htmlspecialchars($element->getText());
             }
         }
-        if ($tag) {
-            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
-        }
+
         return $html;
     }
 
@@ -165,7 +164,7 @@ class Paragraph implements BlockInterface
         }
 
         $xmlReader = new XMLReader();
-        $xmlReader->XML($this->xml);
+        $xmlReader->XML('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' . $this->xml . '</root>');
 
         while ($xmlReader->read()) {
             if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:r') {

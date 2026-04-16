@@ -1,6 +1,6 @@
 <?php
 
-namespace Avadim\FastDocxReader;
+namespace avadim\FastDocxReader;
 
 use XMLReader;
 

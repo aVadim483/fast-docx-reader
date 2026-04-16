@@ -1,15 +1,15 @@
 <?php
 
-namespace Avadim\FastDocxReader\Blocks;
+namespace avadim\FastDocxReader\Blocks;
 
 class ParagraphList extends Paragraph
 {
     /** @var Paragraph[]|ParagraphList[] */
     protected array $items = [];
 
-    public function __construct(string $text = '', string $xml = '')
+    public function __construct(string $xml = '')
     {
-        parent::__construct($text, $xml);
+        parent::__construct($xml);
     }
 
     /**
@@ -64,7 +64,7 @@ class ParagraphList extends Paragraph
             if ($item instanceof ParagraphList) {
                 $html .= $item->getHtml();
             } else {
-                $html .= '<li>' . $item->getHtmlText() . '</li>';
+                $html .= '<li>' . $item->getHtmlContents() . '</li>';
             }
         }
         $html .= '</' . $listTag . '>';

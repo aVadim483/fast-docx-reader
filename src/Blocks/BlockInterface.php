@@ -1,6 +1,6 @@
 <?php
 
-namespace Avadim\FastDocxReader\Blocks;
+namespace avadim\FastDocxReader\Blocks;
 
 interface BlockInterface
 {

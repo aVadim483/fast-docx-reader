@@ -1,6 +1,6 @@
 <?php
 
-namespace Avadim\FastDocxReader\Blocks\Elements;
+namespace avadim\FastDocxReader\Blocks\Elements;
 
 interface ElementInterface
 {

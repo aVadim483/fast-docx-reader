@@ -1,14 +1,60 @@
 <?php
 
-namespace Avadim\FastDocxReader;
+namespace avadim\FastDocxReader;
 
-use Avadim\FastDocxReader\Blocks\Elements\ElementInterface;
-use Avadim\FastDocxReader\Blocks\Elements\Image;
-use Avadim\FastDocxReader\Blocks\Elements\Text;
+use avadim\FastDocxReader\Blocks\Elements\ElementInterface;
+use avadim\FastDocxReader\Blocks\Elements\Image;
+use avadim\FastDocxReader\Blocks\Elements\Text;
 use XMLReader;
 
 class Parser
 {
+    /**
+     * @param string $xml
+     * @param string $tag
+     *
+     * @return array
+     */
+    public static function parseAttributes(string $xml, string $tag): array
+    {
+        $style = [];
+        $xmlReader = new XMLReader();
+        $xmlReader->XML('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' . $xml . '</root>');
+
+        while ($xmlReader->read()) {
+            if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === $tag) {
+                $depth = $xmlReader->depth;
+                while ($xmlReader->read() && $xmlReader->depth > $depth) {
+                    if ($xmlReader->nodeType === XMLReader::ELEMENT) {
+                        $styleName = str_replace('w:', '', $xmlReader->name);
+                        $styleValue = true;
+                        if ($xmlReader->hasAttributes) {
+                            $styleValue = [];
+                            while ($xmlReader->moveToNextAttribute()) {
+                                $attrName = str_replace('w:', '', $xmlReader->name);
+                                $styleValue[$attrName] = $xmlReader->value;
+                            }
+                            if (count($styleValue) === 1 && isset($styleValue['val'])) {
+                                $styleValue = $styleValue['val'];
+                            }
+                            $xmlReader->moveToElement();
+                        }
+                        if (!$xmlReader->isEmptyElement) {
+                            $subDepth = $xmlReader->depth;
+                            while ($xmlReader->read() && $xmlReader->depth > $subDepth) {
+                                // just skip
+                            }
+                        }
+                        $style[$styleName] = $styleValue;
+                    }
+                }
+            }
+        }
+        $xmlReader->close();
+
+        return $style;
+    }
+
     /**
      * @param string $xml
      * @return ElementInterface|null
@@ -16,7 +62,7 @@ class Parser
     public static function parseRun(string $xml): ?ElementInterface
     {
         $xmlReader = new XMLReader();
-        $xmlReader->XML($xml);
+        $xmlReader->XML('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' . $xml . '</root>');
 
         $text = '';
         $style = [];
