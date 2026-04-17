@@ -8,6 +8,7 @@ use avadim\FastDocxReader\Blocks\ParagraphList;
 use avadim\FastDocxReader\Blocks\Table;
 use avadim\FastDocxReader\Exception\Exception;
 use avadim\FastDocxReader\Reader\NumberingMap;
+use avadim\FastDocxReader\Reader\RelationshipMap;
 use avadim\FastDocxReader\Reader\Parser;
 use avadim\FastDocxReader\Reader\Reader;
 use XMLReader;
@@ -23,6 +24,9 @@ class Docx
     /** @var NumberingMap|null */
     protected ?NumberingMap $numberingMap = null;
 
+    /** @var RelationshipMap|null */
+    protected ?RelationshipMap $relationshipMap = null;
+
     /**
      * @param string $file
      * @throws Exception
@@ -35,6 +39,7 @@ class Docx
         $this->file = $file;
 
         $this->numberingMap = new NumberingMap($file);
+        $this->relationshipMap = new RelationshipMap($file);
 
         $this->xmlReader = new Reader($file);
         $this->xmlReader->openZip('word/document.xml');
@@ -164,6 +169,7 @@ class Docx
     {
         $xml = $this->xmlReader->readOuterXml();
         $paragraph = new Paragraph($xml);
+        $paragraph->setDocx($this);
         $style = Parser::parseAttributes($xml, 'w:pPr');
         if ($style) {
             $paragraph->setStyle($style);
@@ -281,7 +287,9 @@ class Docx
             }
         }
 
-        return new Paragraph($xml);
+        $paragraph = new Paragraph($xml);
+        $paragraph->setDocx($this);
+        return $paragraph;
     }
 
 
@@ -339,4 +347,58 @@ class Docx
         return trim($fullText);
     }
 
+    /**
+     * @param string $rId
+     * @return string|null
+     */
+    public function getImageContent(string $rId): ?string
+    {
+        if ($this->relationshipMap) {
+            $target = $this->relationshipMap->getTarget($rId);
+            if ($target) {
+                if (strpos($target, '/') === false) {
+                    $target = 'word/' . $target;
+                } elseif (strpos($target, 'media/') === 0) {
+                    $target = 'word/' . $target;
+                }
+
+                $zip = new \ZipArchive();
+                if ($zip->open($this->file) === true) {
+                    $content = $zip->getFromName($target);
+                    $zip->close();
+                    return $content ?: null;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param string $rId
+     * @return string|null
+     */
+    public function getImageMimeType(string $rId): ?string
+    {
+        if ($this->relationshipMap) {
+            $target = $this->relationshipMap->getTarget($rId);
+            if ($target) {
+                $ext = strtolower(pathinfo($target, PATHINFO_EXTENSION));
+                switch ($ext) {
+                    case 'jpg':
+                    case 'jpeg':
+                        return 'image/jpeg';
+                    case 'png':
+                        return 'image/png';
+                    case 'gif':
+                        return 'image/gif';
+                    case 'svg':
+                        return 'image/svg+xml';
+                    case 'tif':
+                    case 'tiff':
+                        return 'image/tiff';
+                }
+            }
+        }
+        return null;
+    }
 }

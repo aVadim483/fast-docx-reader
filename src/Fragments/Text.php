@@ -1,8 +1,8 @@
 <?php
 
-namespace avadim\FastDocxReader\Elements;
+namespace avadim\FastDocxReader\Fragments;
 
-class Text implements ElementInterface
+class Text implements FragmentInterface
 {
     /** @var string */
     protected string $text;

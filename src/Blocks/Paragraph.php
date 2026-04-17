@@ -2,7 +2,8 @@
 
 namespace avadim\FastDocxReader\Blocks;
 
-use avadim\FastDocxReader\Elements\ElementInterface;
+use avadim\FastDocxReader\Docx;
+use avadim\FastDocxReader\Fragments\FragmentInterface;
 use avadim\FastDocxReader\Reader\Parser;
 use XMLReader;
 
@@ -10,6 +11,9 @@ class Paragraph implements BlockInterface
 {
     /** @var string|null */
     protected ?string $text = null;
+
+    /** @var Docx|null */
+    protected ?Docx $docx = null;
 
     /** @var string */
     protected string $xml;
@@ -102,6 +106,14 @@ class Paragraph implements BlockInterface
     }
 
     /**
+     * @param Docx|null $docx
+     */
+    public function setDocx(?Docx $docx): void
+    {
+        $this->docx = $docx;
+    }
+
+    /**
      * @return array
      */
     public function getStyle(): array
@@ -171,8 +183,10 @@ class Paragraph implements BlockInterface
     {
         $html = '';
         foreach ($this->elements() as $element) {
-            if ($element instanceof \avadim\FastDocxReader\Elements\Text) {
+            if ($element instanceof \avadim\FastDocxReader\Fragments\Text) {
                 $html .= $element->getHtml('');
+            } elseif ($element instanceof \avadim\FastDocxReader\Fragments\Image) {
+                $html .= $element->getHtml();
             } else {
                 $html .= htmlspecialchars($element->getText());
             }
@@ -182,7 +196,7 @@ class Paragraph implements BlockInterface
     }
 
     /**
-     * @return iterable|ElementInterface[]
+     * @return iterable|FragmentInterface[]
      */
     public function elements(): iterable
     {
@@ -198,6 +212,9 @@ class Paragraph implements BlockInterface
                 $nodeXml = $xmlReader->readOuterXml();
                 $element = Parser::parseRun($nodeXml);
                 if ($element) {
+                    if ($this->docx && $element instanceof \avadim\FastDocxReader\Fragments\Image) {
+                        $element->setDocx($this->docx);
+                    }
                     yield $element;
                 }
             }
