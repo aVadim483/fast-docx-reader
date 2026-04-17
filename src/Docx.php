@@ -173,6 +173,12 @@ class Docx
         $style = Parser::parseAttributes($xml, 'w:pPr');
         if ($style) {
             $paragraph->setStyle($style);
+            if (isset($style['numPr'])) {
+                $listParams = $this->getListParams($xml);
+                if ($listParams) {
+                    $paragraph->setListParams($listParams['listId'], $listParams['level']);
+                }
+            }
         }
 
         return $paragraph;

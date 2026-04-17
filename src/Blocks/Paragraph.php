@@ -162,14 +162,35 @@ class Paragraph implements BlockInterface
     {
         $html = $this->getHtmlContents();
         if ($tag) {
-            $styleStr = '';
             $styles = [];
             if (!empty($this->style['jc'])) {
                 $styles[] = 'text-align:' . $this->style['jc'];
             }
-            if ($styles) {
-                $styleStr = ' style="' . implode(';', $styles) . '"';
+            if (!empty($this->style['rPr']['sz'])) {
+                $fontSize = ((float)$this->style['rPr']['sz'] / 2) . 'pt';
+                $styles[] = 'font-size:' . $fontSize;
+                $styles[] = 'min-height:' . $fontSize;
             }
+            if (!empty($this->style['rPr']['b']) || !empty($this->style['rPr']['bCs'])) {
+                $styles[] = 'font-weight:bold';
+            }
+            if (!empty($this->style['rPr']['i']) || !empty($this->style['rPr']['iCs'])) {
+                $styles[] = 'font-style:italic';
+            }
+            if (!empty($this->style['rPr']['u'])) {
+                $styles[] = 'text-decoration:underline';
+            }
+            if (!empty($this->style['rPr']['color'])) {
+                $color = $this->style['rPr']['color'];
+                if (is_array($color) && isset($color['val'])) {
+                    $color = $color['val'];
+                }
+                if (is_string($color)) {
+                    $styles[] = 'color:#' . $color;
+                }
+            }
+
+            $styleStr = $styles ? ' style="' . implode(';', $styles) . '"' : '';
             $html = '<' . $tag . $styleStr . '>' . $html . '</' . $tag . '>';
         }
 

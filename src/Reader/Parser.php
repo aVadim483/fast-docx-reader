@@ -22,16 +22,16 @@ class Parser
         $xmlReader->XML('<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' . $xml . '</root>');
 
         while ($xmlReader->read()) {
-            if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === $tag) {
+            if ($xmlReader->nodeType === XMLReader::ELEMENT && ($xmlReader->name === $tag || $xmlReader->localName === str_replace('w:', '', $tag))) {
                 $depth = $xmlReader->depth;
                 while ($xmlReader->read() && $xmlReader->depth > $depth) {
                     if ($xmlReader->nodeType === XMLReader::ELEMENT) {
-                        $styleName = str_replace('w:', '', $xmlReader->name);
+                        $styleName = $xmlReader->localName;
                         $styleValue = true;
                         if ($xmlReader->hasAttributes) {
                             $styleValue = [];
                             while ($xmlReader->moveToNextAttribute()) {
-                                $attrName = str_replace('w:', '', $xmlReader->name);
+                                $attrName = $xmlReader->localName;
                                 $styleValue[$attrName] = $xmlReader->value;
                             }
                             if (count($styleValue) === 1 && isset($styleValue['val'])) {
@@ -41,8 +41,51 @@ class Parser
                         }
                         if (!$xmlReader->isEmptyElement) {
                             $subDepth = $xmlReader->depth;
+                            $styleValue = [];
                             while ($xmlReader->read() && $xmlReader->depth > $subDepth) {
-                                // just skip
+                                if ($xmlReader->nodeType === XMLReader::ELEMENT) {
+                                    $subStyleName = $xmlReader->localName;
+                                    $subStyleValue = true;
+                                    if ($xmlReader->hasAttributes) {
+                                        $subStyleValue = [];
+                                        while ($xmlReader->moveToNextAttribute()) {
+                                            $subStyleValue[$xmlReader->localName] = $xmlReader->value;
+                                        }
+                                        if (count($subStyleValue) === 1 && isset($subStyleValue['val'])) {
+                                            $subStyleValue = $subStyleValue['val'];
+                                        }
+                                        $xmlReader->moveToElement();
+                                    }
+                                    if (!$xmlReader->isEmptyElement) {
+                                        $subSubDepth = $xmlReader->depth;
+                                        $subSubStyle = [];
+                                        while ($xmlReader->read() && $xmlReader->depth > $subSubDepth) {
+                                            if ($xmlReader->nodeType === XMLReader::ELEMENT) {
+                                                $subSubStyleName = $xmlReader->localName;
+                                                $subSubStyleValue = true;
+                                                if ($xmlReader->hasAttributes) {
+                                                    $subSubStyleValue = [];
+                                                    while ($xmlReader->moveToNextAttribute()) {
+                                                        $subSubStyleValue[$xmlReader->localName] = $xmlReader->value;
+                                                    }
+                                                    if (count($subSubStyleValue) === 1 && isset($subSubStyleValue['val'])) {
+                                                        $subSubStyleValue = $subSubStyleValue['val'];
+                                                    }
+                                                    $xmlReader->moveToElement();
+                                                }
+                                                $subSubStyle[$subSubStyleName] = $subSubStyleValue;
+                                            }
+                                        }
+                                        if ($subSubStyle) {
+                                            if ($subStyleValue === true) {
+                                                $subStyleValue = $subSubStyle;
+                                            } elseif (is_array($subStyleValue)) {
+                                                $subStyleValue = array_merge($subStyleValue, $subSubStyle);
+                                            }
+                                        }
+                                    }
+                                    $styleValue[$subStyleName] = $subStyleValue;
+                                }
                             }
                         }
                         $style[$styleName] = $styleValue;
