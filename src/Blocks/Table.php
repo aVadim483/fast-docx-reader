@@ -130,17 +130,12 @@ class Table implements BlockInterface
                 $tableStyle .= ' width: auto;';
             }
         }
-        if (!empty($this->style['tblBorders'])) {
-            foreach (['top', 'left', 'bottom', 'right', 'insideH', 'insideV'] as $side) {
-                if (isset($this->style['tblBorders'][$side])) {
-                    // We can handle some basic borders here if needed, 
-                    // but usually they are applied to cells
-                }
-            }
-        }
 
         $html = '<table' . ($tableStyle ? ' style="' . trim($tableStyle) . '"' : '') . '>';
-        foreach ($this->rows as $row) {
+
+        $mergedCells = []; // [rowIdx][colIdx] = true if cell is vertically merged and should be skipped
+
+        foreach ($this->rows as $rowIdx => $row) {
             $rowStyle = [];
             if (is_array($row) && isset($row['cells'])) {
                 $cells = $row['cells'];
@@ -156,13 +151,97 @@ class Table implements BlockInterface
             }
 
             $html .= '<tr' . ($trStyle ? ' style="' . trim($trStyle) . '"' : '') . '>';
+            $colIdx = 0;
             foreach ($cells as $cell) {
+                // Skip cells that are covered by a vertical merge from above
+                while (isset($mergedCells[$rowIdx][$colIdx])) {
+                    $colIdx++;
+                }
+
                 if (is_array($cell) && isset($cell['value'])) {
                     $cellValues = $cell['value'];
                     $cellStyle = $cell['style'] ?? [];
                 } else {
                     $cellValues = $cell;
                     $cellStyle = [];
+                }
+
+                // Horizontal merge
+                $colspan = 1;
+                if (!empty($cellStyle['gridSpan'])) {
+                    $colspan = (int)$cellStyle['gridSpan'];
+                }
+
+                // Vertical merge
+                $rowspan = 1;
+                if (isset($cellStyle['vMerge'])) {
+                    $vMerge = $cellStyle['vMerge'];
+                    if ($vMerge === 'restart') {
+                        // This is the start of a vertical merge.
+                        // We need to look ahead to subsequent rows to find how many to merge.
+                        $nextRowIdx = $rowIdx + 1;
+                        while (isset($this->rows[$nextRowIdx])) {
+                            $nextRow = $this->rows[$nextRowIdx];
+                            $nextRowCells = is_array($nextRow) && isset($nextRow['cells']) ? $nextRow['cells'] : $nextRow;
+                            
+                            // Find the corresponding cell in the next row
+                            // This is tricky because of gridSpan and previous merges.
+                            // We need to match the visual column index.
+                            
+                            $nextColIdx = 0;
+                            $foundCell = null;
+                            foreach ($nextRowCells as $nextCell) {
+                                if ($nextColIdx === $colIdx) {
+                                    $foundCell = $nextCell;
+                                    break;
+                                }
+                                $nextCellStyle = is_array($nextCell) && isset($nextCell['style']) ? $nextCell['style'] : [];
+                                $nextColIdx += !empty($nextCellStyle['gridSpan']) ? (int)$nextCellStyle['gridSpan'] : 1;
+                                if ($nextColIdx > $colIdx) {
+                                    // This shouldn't happen in well-formed DOCX where vMerge aligns with gridSpan
+                                    break;
+                                }
+                            }
+
+                            if ($foundCell) {
+                                $nextCellStyle = is_array($foundCell) && isset($foundCell['style']) ? $foundCell['style'] : [];
+                                if (isset($nextCellStyle['vMerge']) && $nextCellStyle['vMerge'] !== 'restart') {
+                                    $rowspan++;
+                                    // Mark these cells as merged so they are skipped when processing their rows
+                                    for ($c = 0; $c < $colspan; $c++) {
+                                        $mergedCells[$nextRowIdx][$colIdx + $c] = true;
+                                    }
+                                    $nextRowIdx++;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        // This is a continuation of a vertical merge (vMerge without 'restart' or with empty value)
+                        // It should have been marked in $mergedCells when 'restart' was encountered.
+                        // If we are here, it means we might have missed the 'restart' or it's an invalid table.
+                        // But we should skip it anyway if it's a merge continuation.
+                        $colIdx += $colspan;
+                        continue;
+                    }
+                } else {
+                    // Not a vertical merge, but might have horizontal merge
+                    if ($colspan > 1) {
+                        for ($c = 1; $c < $colspan; $c++) {
+                            $mergedCells[$rowIdx][$colIdx + $c] = true;
+                        }
+                    }
+                }
+
+                $tdAttributes = '';
+                if ($colspan > 1) {
+                    $tdAttributes .= ' colspan="' . $colspan . '"';
+                }
+                if ($rowspan > 1) {
+                    $tdAttributes .= ' rowspan="' . $rowspan . '"';
                 }
 
                 $tdStyle = 'border: 1px solid black; padding: 4px;';
@@ -201,7 +280,7 @@ class Table implements BlockInterface
                     }
                 }
 
-                $html .= '<td style="' . trim($tdStyle) . '">';
+                $html .= '<td' . $tdAttributes . ' style="' . trim($tdStyle) . '">';
                 if (is_array($cellValues)) {
                     foreach ($cellValues as $cellValue) {
                         if ($cellValue instanceof Paragraph) {
@@ -228,6 +307,7 @@ class Table implements BlockInterface
                     $html .= htmlspecialchars((string)$cellValues);
                 }
                 $html .= '</td>';
+                $colIdx += $colspan;
             }
             $html .= '</tr>';
         }
