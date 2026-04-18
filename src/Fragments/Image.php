@@ -2,6 +2,7 @@
 
 namespace avadim\FastDocxReader\Fragments;
 use avadim\FastDocxReader\Docx;
+use avadim\FastDocxReader\Interfaces\FragmentInterface;
 
 class Image implements FragmentInterface
 {
@@ -71,7 +72,7 @@ class Image implements FragmentInterface
     /**
      * @return array
      */
-    public function getStyle(): array
+    public function getStyleOptions(): array
     {
         return $this->style;
     }
@@ -79,7 +80,7 @@ class Image implements FragmentInterface
     /**
      * @param array $style
      */
-    public function setStyle(array $style): void
+    public function setStyleOptions(array $style): void
     {
         $this->style = $style;
     }
@@ -87,7 +88,7 @@ class Image implements FragmentInterface
     /**
      * @return string
      */
-    public function getHtml(): string
+    public function toHtml(): string
     {
         $styles = [];
         if (!empty($this->size['width'])) {

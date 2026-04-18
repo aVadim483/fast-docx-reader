@@ -2,15 +2,15 @@
 
 namespace avadim\FastDocxReader;
 
-use avadim\FastDocxReader\Blocks\BlockInterface;
 use avadim\FastDocxReader\Blocks\Paragraph;
 use avadim\FastDocxReader\Blocks\ParagraphList;
 use avadim\FastDocxReader\Blocks\Table;
 use avadim\FastDocxReader\Exception\Exception;
+use avadim\FastDocxReader\Interfaces\BlockInterface;
 use avadim\FastDocxReader\Reader\NumberingMap;
-use avadim\FastDocxReader\Reader\RelationshipMap;
 use avadim\FastDocxReader\Reader\Parser;
 use avadim\FastDocxReader\Reader\Reader;
+use avadim\FastDocxReader\Reader\RelationshipMap;
 use XMLReader;
 
 class Docx

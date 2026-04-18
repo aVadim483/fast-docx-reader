@@ -2,6 +2,8 @@
 
 namespace avadim\FastDocxReader\Fragments;
 
+use avadim\FastDocxReader\Interfaces\FragmentInterface;
+
 class Text implements FragmentInterface
 {
     /** @var string */
@@ -65,7 +67,7 @@ class Text implements FragmentInterface
     /**
      * @return array
      */
-    public function getStyle(): array
+    public function getStyleOptions(): array
     {
         return $this->style;
     }
@@ -73,7 +75,7 @@ class Text implements FragmentInterface
     /**
      * @param array $style
      */
-    public function setStyle(array $style): void
+    public function setStyleOptions(array $style): void
     {
         $this->style = $style;
     }
@@ -82,7 +84,7 @@ class Text implements FragmentInterface
      * @param string $tag
      * @return string
      */
-    public function getHtml(string $tag = 'span'): string
+    public function toHtml(string $tag = 'span'): string
     {
         $styles = [];
         if (!empty($this->style['b']) || !empty($this->style['bCs'])) {

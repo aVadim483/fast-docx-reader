@@ -2,6 +2,8 @@
 
 namespace avadim\FastDocxReader\Blocks;
 
+use avadim\FastDocxReader\Interfaces\BlockInterface;
+
 class Table implements BlockInterface
 {
     /** @var array */
@@ -110,15 +112,23 @@ class Table implements BlockInterface
     /**
      * @return array
      */
-    public function getStyle(): array
+    public function getStyleOptions(): array
     {
         return $this->style;
     }
 
     /**
+     * @param array $style
+     */
+    public function setStyleOptions(array $style): void
+    {
+        $this->style = $style;
+    }
+
+    /**
      * @return string
      */
-    public function getHtml(): string
+    public function toHtml(): string
     {
         $tableStyle = 'border-collapse: collapse;';
         if (!empty($this->style['tblW']['w']) && !empty($this->style['tblW']['type'])) {
@@ -284,7 +294,7 @@ class Table implements BlockInterface
                 if (is_array($cellValues)) {
                     foreach ($cellValues as $cellValue) {
                         if ($cellValue instanceof Paragraph) {
-                            $html .= $cellValue->getHtml();
+                            $html .= $cellValue->toHtml();
                         } elseif ($cellValue instanceof BlockInterface) {
                             if (method_exists($cellValue, 'getHtml')) {
                                 $html .= $cellValue->getHtml();
@@ -296,7 +306,7 @@ class Table implements BlockInterface
                         }
                     }
                 } elseif ($cellValues instanceof Paragraph) {
-                    $html .= $cellValues->getHtml();
+                    $html .= $cellValues->toHtml();
                 } elseif ($cellValues instanceof BlockInterface) {
                     if (method_exists($cellValues, 'getHtml')) {
                         $html .= $cellValues->getHtml();

@@ -56,13 +56,13 @@ class ParagraphList extends Paragraph
      * @param string $tag
      * @return string
      */
-    public function getHtml(string $tag = ''): string
+    public function toHtml(string $tag = ''): string
     {
         $listTag = $this->isBullet() ? 'ul' : 'ol';
         $html = '<' . $listTag . '>';
         foreach ($this->items as $item) {
             if ($item instanceof ParagraphList) {
-                $html .= $item->getHtml();
+                $html .= $item->toHtml();
             } else {
                 $html .= '<li>' . $item->getHtmlContents() . '</li>';
             }

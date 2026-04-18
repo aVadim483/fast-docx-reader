@@ -3,7 +3,8 @@
 namespace avadim\FastDocxReader\Blocks;
 
 use avadim\FastDocxReader\Docx;
-use avadim\FastDocxReader\Fragments\FragmentInterface;
+use avadim\FastDocxReader\Interfaces\BlockInterface;
+use avadim\FastDocxReader\Interfaces\FragmentInterface;
 use avadim\FastDocxReader\Reader\Parser;
 use XMLReader;
 
@@ -116,7 +117,7 @@ class Paragraph implements BlockInterface
     /**
      * @return array
      */
-    public function getStyle(): array
+    public function getStyleOptions(): array
     {
         return $this->style;
     }
@@ -124,7 +125,7 @@ class Paragraph implements BlockInterface
     /**
      * @param array $style
      */
-    public function setStyle(array $style): void
+    public function setStyleOptions(array $style): void
     {
         $this->style = $style;
     }
@@ -158,7 +159,7 @@ class Paragraph implements BlockInterface
      * @param string $tag
      * @return string
      */
-    public function getHtml(string $tag = 'p'): string
+    public function toHtml(string $tag = 'p'): string
     {
         $html = $this->getHtmlContents();
         if ($tag) {
@@ -205,9 +206,9 @@ class Paragraph implements BlockInterface
         $html = '';
         foreach ($this->elements() as $element) {
             if ($element instanceof \avadim\FastDocxReader\Fragments\Text) {
-                $html .= $element->getHtml('');
+                $html .= $element->toHtml('');
             } elseif ($element instanceof \avadim\FastDocxReader\Fragments\Image) {
-                $html .= $element->getHtml();
+                $html .= $element->toHtml();
             } else {
                 $html .= htmlspecialchars($element->getText());
             }

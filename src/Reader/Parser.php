@@ -2,9 +2,9 @@
 
 namespace avadim\FastDocxReader\Reader;
 
-use avadim\FastDocxReader\Fragments\FragmentInterface;
 use avadim\FastDocxReader\Fragments\Image;
 use avadim\FastDocxReader\Fragments\Text;
+use avadim\FastDocxReader\Interfaces\FragmentInterface;
 use XMLReader;
 
 class Parser
