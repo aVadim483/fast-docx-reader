@@ -21,8 +21,9 @@ class NumberingMap
     public function __construct(string $file)
     {
         $xmlReader = new Reader($file);
-        $xmlReader->openZip('word/numbering.xml');
-        $this->parse($xmlReader);
+        if ($xmlReader->openZip('word/numbering.xml')) {
+            $this->parse($xmlReader);
+        }
     }
 
     /**

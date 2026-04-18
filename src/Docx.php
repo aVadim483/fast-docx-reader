@@ -74,6 +74,9 @@ class Docx
 
     public static function getPlainTextOptions(): PlainTextOptions
     {
+        if (empty(self::$plainTextOptions)) {
+            self::$plainTextOptions = new PlainTextOptions();
+        }
         return self::$plainTextOptions;
     }
 
@@ -84,6 +87,9 @@ class Docx
 
     public static function getHtmlOptions(): HtmlOptions
     {
+        if (empty(self::$htmlOptions)) {
+            self::$htmlOptions = new HtmlOptions();
+        }
         return self::$htmlOptions;
     }
 
@@ -214,7 +220,7 @@ class Docx
             if (isset($style['numPr'])) {
                 $listParams = $this->getListParams($xml);
                 if ($listParams) {
-                    $paragraph->setListParams($listParams['listId'], $listParams['level']);
+                    $paragraph->setListParams($listParams['numId'], $listParams['ilvl']);
                 }
             }
         }

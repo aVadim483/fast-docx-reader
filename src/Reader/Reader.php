@@ -42,6 +42,11 @@ class Reader extends \XMLReader
         $this->close();
     }
 
+    public function zipEntryExists(string $entryName): bool
+    {
+        return $this->zip->locateName($entryName) !== false;
+    }
+
     /**
      * @param string|null $tempDir
      */
