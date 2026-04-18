@@ -3,6 +3,8 @@
 namespace avadim\FastDocxReader\Fragments;
 use avadim\FastDocxReader\Docx;
 use avadim\FastDocxReader\Interfaces\FragmentInterface;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
 
 class Image implements FragmentInterface
 {
@@ -53,26 +55,24 @@ class Image implements FragmentInterface
     {
         return $this->size;
     }
-    /**
-     * @return string
-     */
-    public function getType(): string
-    {
-        return 'image';
-    }
 
     /**
+     * @param PlainTextOptions|null $options
      * @return string
      */
-    public function getText(): string
+    public function getText(?PlainTextOptions $options = null): string
     {
+        $options = $options ?? Docx::getPlainTextOptions();
+        if (!$options->ignoreImages) {
+            return $options->imagePlaceholder;
+        }
         return '';
     }
 
     /**
      * @return array
      */
-    public function getStyleOptions(): array
+    public function getStyleProps(): array
     {
         return $this->style;
     }
@@ -80,16 +80,18 @@ class Image implements FragmentInterface
     /**
      * @param array $style
      */
-    public function setStyleOptions(array $style): void
+    public function setStyleProps(array $style): void
     {
         $this->style = $style;
     }
 
     /**
+     * @param HtmlOptions|null $options
      * @return string
      */
-    public function toHtml(): string
+    public function toHtml(?HtmlOptions $options = null): string
     {
+        $options = $options ?? Docx::getHtmlOptions();
         $styles = [];
         if (!empty($this->size['width'])) {
             $styles[] = 'width:' . round($this->size['width'] / 12700) . 'pt';

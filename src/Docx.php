@@ -5,8 +5,10 @@ namespace avadim\FastDocxReader;
 use avadim\FastDocxReader\Blocks\Paragraph;
 use avadim\FastDocxReader\Blocks\ParagraphList;
 use avadim\FastDocxReader\Blocks\Table;
-use avadim\FastDocxReader\Exception\Exception;
+use avadim\FastDocxReader\Exceptions\Exception;
 use avadim\FastDocxReader\Interfaces\BlockInterface;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
 use avadim\FastDocxReader\Reader\NumberingMap;
 use avadim\FastDocxReader\Reader\Parser;
 use avadim\FastDocxReader\Reader\Reader;
@@ -27,6 +29,14 @@ class Docx
     /** @var RelationshipMap|null */
     protected ?RelationshipMap $relationshipMap = null;
 
+    /** @var array */
+    protected array $sectionsProps = [];
+
+    protected static ?PlainTextOptions $plainTextOptions = null;
+
+    protected static ?HtmlOptions $htmlOptions = null;
+
+
     /**
      * @param string $file
      * @throws Exception
@@ -37,12 +47,20 @@ class Docx
             throw new Exception("File not found: $file");
         }
         $this->file = $file;
+        if (empty(self::$plainTextOptions)) {
+            self::$plainTextOptions = new PlainTextOptions();
+        }
+        if (empty(self::$htmlOptions)) {
+            self::$htmlOptions = new HtmlOptions();
+        }
 
         $this->numberingMap = new NumberingMap($file);
         $this->relationshipMap = new RelationshipMap($file);
 
         $this->xmlReader = new Reader($file);
         $this->xmlReader->openZip('word/document.xml');
+
+        $this->readSectionProps();
     }
 
 
@@ -52,6 +70,26 @@ class Docx
             $this->xmlReader->close();
             $this->xmlReader = null;
         }
+    }
+
+    public static function getPlainTextOptions(): PlainTextOptions
+    {
+        return self::$plainTextOptions;
+    }
+
+    public static function setPlainTextOptions(PlainTextOptions $options): void
+    {
+        self::$plainTextOptions = $options;
+    }
+
+    public static function getHtmlOptions(): HtmlOptions
+    {
+        return self::$htmlOptions;
+    }
+
+    public static function setHtmlOptions(HtmlOptions $options): void
+    {
+        self::$htmlOptions = $options;
     }
 
     /**
@@ -172,7 +210,7 @@ class Docx
         $paragraph->setDocx($this);
         $style = Parser::parseAttributes($xml, 'w:pPr');
         if ($style) {
-            $paragraph->setStyle($style);
+            $paragraph->setStyleProps($style);
             if (isset($style['numPr'])) {
                 $listParams = $this->getListParams($xml);
                 if ($listParams) {
@@ -340,17 +378,27 @@ class Docx
 
 
     /**
-     * @param array $options
+     * @param PlainTextOptions|null $options
      * @return string
-     * @throws Exception
      */
-    public function getText(array $options = []): string
+    public function getText(?PlainTextOptions $options = null): string
     {
+        $options = $options ?? self::getPlainTextOptions();
         $fullText = '';
         foreach ($this->blocks() as $block) {
-            $fullText .= $block->getText() . "\n";
+            $fullText .= $block->getText($options) . $options->blockSeparator;
         }
         return trim($fullText);
+    }
+
+    public function toHtml(): string
+    {
+        $html = '';
+        foreach ($this->blocks() as $block) {
+            $html .= $block->toHtml();
+        }
+        return $html;
+
     }
 
     /**
@@ -405,6 +453,75 @@ class Docx
                 }
             }
         }
+        return null;
+    }
+
+    /**
+     * @return array
+     */
+    protected function readSectionProps(): array
+    {
+        $this->sectionsProps = [];
+        $xmlReader = new XMLReader();
+        $zip = new \ZipArchive();
+        if ($zip->open($this->file) === true) {
+            $xml = $zip->getFromName('word/document.xml');
+            $zip->close();
+            if ($xml) {
+                $xmlReader->XML($xml);
+                while ($xmlReader->read()) {
+                    if ($xmlReader->nodeType === XMLReader::ELEMENT && $xmlReader->name === 'w:sectPr') {
+                        $this->sectionsProps[] = Parser::parseAttributes($xmlReader->readOuterXml(), 'w:sectPr');
+                    }
+                }
+                $xmlReader->close();
+            }
+        }
+
+        return $this->sectionsProps;
+    }
+
+    /**
+     * @param int $sectionNum
+     *
+     * @return array|null
+     */
+    public function getPaperSize(int $sectionNum = 0): ?array
+    {
+        if (isset($this->sectionsProps[$sectionNum]['pgSz'])) {
+            $size = $this->sectionsProps[$sectionNum]['pgSz'];
+            if (is_array($size)) {
+                foreach (['w', 'h'] as $key) {
+                    if (isset($size[$key])) {
+                        $size[$key] = (int)round($size[$key] / 15);
+                    }
+                }
+            }
+            return $size;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param int $sectionNum
+     *
+     * @return array|null
+     */
+    public function getMargins(int $sectionNum = 0): ?array
+    {
+        if (isset($this->sectionsProps[$sectionNum]['pgMar'])) {
+            $margins = $this->sectionsProps[$sectionNum]['pgMar'];
+            if (is_array($margins)) {
+                foreach (['top', 'right', 'bottom', 'left', 'header', 'footer', 'gutter'] as $key) {
+                    if (isset($margins[$key])) {
+                        $margins[$key] = (int)round($margins[$key] / 15);
+                    }
+                }
+            }
+            return $margins;
+        }
+
         return null;
     }
 }

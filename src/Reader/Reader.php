@@ -2,7 +2,7 @@
 
 namespace avadim\FastDocxReader\Reader;
 
-use avadim\FastDocxReader\Exception\Exception;
+use avadim\FastDocxReader\Exceptions\Exception;
 
 class Reader extends \XMLReader
 {

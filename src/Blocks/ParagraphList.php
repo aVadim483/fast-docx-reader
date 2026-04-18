@@ -2,6 +2,10 @@
 
 namespace avadim\FastDocxReader\Blocks;
 
+use avadim\FastDocxReader\Docx;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
+
 class ParagraphList extends Paragraph
 {
     /** @var Paragraph[]|ParagraphList[] */
@@ -29,8 +33,9 @@ class ParagraphList extends Paragraph
         return $this->items;
     }
 
-    public function getText(): string
+    public function getText(?PlainTextOptions $options = null): string
     {
+        $options = $options ?? Docx::getPlainTextOptions();
         $text = '';
         foreach ($this->items as $item) {
             if ($item instanceof ParagraphList) {
@@ -38,26 +43,22 @@ class ParagraphList extends Paragraph
             } else {
                 $marker = $item->getMarker();
                 if ($marker !== null) {
-                    $text .= $marker . ' ' . $item->getText() . "\n";
+                    $text .= $marker . ' ' . $item->getText($options) . "\n";
                 } else {
-                    $text .= $item->getText() . "\n";
+                    $text .= $item->getText($options) . "\n";
                 }
             }
         }
         return $text;
     }
 
-    public function getType(): string
-    {
-        return 'list';
-    }
-
     /**
-     * @param string $tag
+     * @param HtmlOptions|null $options
      * @return string
      */
-    public function toHtml(string $tag = ''): string
+    public function toHtml(?HtmlOptions $options = null): string
     {
+        $options = $options ?? Docx::getHtmlOptions();
         $listTag = $this->isBullet() ? 'ul' : 'ol';
         $html = '<' . $listTag . '>';
         foreach ($this->items as $item) {
@@ -68,9 +69,7 @@ class ParagraphList extends Paragraph
             }
         }
         $html .= '</' . $listTag . '>';
-        if ($tag) {
-            $html = '<' . $tag . '>' . $html . '</' . $tag . '>';
-        }
+
         return $html;
     }
 

@@ -3,8 +3,11 @@
 namespace avadim\FastDocxReader\Blocks;
 
 use avadim\FastDocxReader\Docx;
+use avadim\FastDocxReader\Fragments\Image;
 use avadim\FastDocxReader\Interfaces\BlockInterface;
 use avadim\FastDocxReader\Interfaces\FragmentInterface;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
 use avadim\FastDocxReader\Reader\Parser;
 use XMLReader;
 
@@ -33,6 +36,7 @@ class Paragraph implements BlockInterface
 
     /** @var array */
     protected array $style = [];
+
 
     public function __construct(string $xml = '')
     {
@@ -117,7 +121,7 @@ class Paragraph implements BlockInterface
     /**
      * @return array
      */
-    public function getStyleOptions(): array
+    public function getStyleProps(): array
     {
         return $this->style;
     }
@@ -125,26 +129,22 @@ class Paragraph implements BlockInterface
     /**
      * @param array $style
      */
-    public function setStyleOptions(array $style): void
+    public function setStyleProps(array $style): void
     {
         $this->style = $style;
     }
 
-    public function getText(): string
+    public function getText(?PlainTextOptions $options = null): string
     {
+        $options = $options ?? Docx::getPlainTextOptions();
         if ($this->text === null) {
             $this->text = '';
             foreach ($this->elements() as $element) {
-                $this->text .= $element->getText();
+                $this->text .= $element->getText($options);
             }
         }
 
         return $this->text;
-    }
-
-    public function getType(): string
-    {
-        return 'paragraph';
     }
 
     /**
@@ -156,11 +156,13 @@ class Paragraph implements BlockInterface
     }
 
     /**
-     * @param string $tag
+     * @param HtmlOptions|null $options
      * @return string
      */
-    public function toHtml(string $tag = 'p'): string
+    public function toHtml(?HtmlOptions $options = null): string
     {
+        $options = $options ?? Docx::getHtmlOptions();
+        $tag = 'p';
         $html = $this->getHtmlContents();
         if ($tag) {
             $styles = [];
@@ -206,8 +208,8 @@ class Paragraph implements BlockInterface
         $html = '';
         foreach ($this->elements() as $element) {
             if ($element instanceof \avadim\FastDocxReader\Fragments\Text) {
-                $html .= $element->toHtml('');
-            } elseif ($element instanceof \avadim\FastDocxReader\Fragments\Image) {
+                $html .= $element->toHtml();
+            } elseif ($element instanceof Image) {
                 $html .= $element->toHtml();
             } else {
                 $html .= htmlspecialchars($element->getText());
@@ -234,7 +236,7 @@ class Paragraph implements BlockInterface
                 $nodeXml = $xmlReader->readOuterXml();
                 $element = Parser::parseRun($nodeXml);
                 if ($element) {
-                    if ($this->docx && $element instanceof \avadim\FastDocxReader\Fragments\Image) {
+                    if ($this->docx && $element instanceof Image) {
                         $element->setDocx($this->docx);
                     }
                     yield $element;

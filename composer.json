@@ -1,6 +1,25 @@
 {
   "name": "avadim/fast-docx-reader",
-  "description": "Fast DOCX reader skeleton with streaming-oriented architecture",
+  "description": "Fast and simple DOCX reader for PHP. Extract text and tables from DOCX files, convert DOCX to HTML.",
+  "keywords": [
+    "php",
+    "docx",
+    "ooxml",
+    "reader",
+    "xmlreader",
+    "word",
+    "msword",
+    "parser",
+    "reader",
+    "import",
+    "office",
+    "office 2007",
+    "libreoffice",
+    "document",
+    "wordprocessing",
+    "extract-text",
+    "text-extraction"
+  ],
   "type": "library",
   "license": "MIT",
   "autoload": {

@@ -1,6 +1,6 @@
 <?php
 
-namespace avadim\FastDocxReader\Exception;
+namespace avadim\FastDocxReader\Exceptions;
 
 class Exception extends \RuntimeException
 {

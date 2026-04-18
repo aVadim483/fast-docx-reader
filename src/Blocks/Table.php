@@ -2,7 +2,10 @@
 
 namespace avadim\FastDocxReader\Blocks;
 
+use avadim\FastDocxReader\Docx;
 use avadim\FastDocxReader\Interfaces\BlockInterface;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
 
 class Table implements BlockInterface
 {
@@ -18,8 +21,9 @@ class Table implements BlockInterface
         $this->style = $style;
     }
 
-    public function getText(): string
+    public function getText(?PlainTextOptions $options = null): string
     {
+        $options = $options ?? Docx::getPlainTextOptions();
         $text = '';
         foreach ($this->rows as $row) {
             $rowText = [];
@@ -34,32 +38,27 @@ class Table implements BlockInterface
                     $cellText = '';
                     foreach ($cellValue as $value) {
                         if ($value instanceof BlockInterface) {
-                            $cellText .= $value->getText();
+                            $cellText .= $value->getText($options);
                         } else {
                             $cellText .= (string)$value;
                         }
                     }
                     $rowText[] = $cellText;
                 } elseif ($cellValue instanceof BlockInterface) {
-                    $rowText[] = $cellValue->getText();
+                    $rowText[] = $cellValue->getText($options);
                 } else {
                     $rowText[] = (string)$cellValue;
                 }
             }
-            $text .= implode("\t", $rowText) . "\n";
+            $text .= implode($options->tableCellSeparator, $rowText) . $options->tableRowSeparator;
         }
         return $text;
-    }
-
-    public function getType(): string
-    {
-        return 'table';
     }
 
     /**
      * @return array
      */
-    public function getRows(): array
+    public function getRowsData(): array
     {
         return $this->rows;
     }
@@ -70,7 +69,7 @@ class Table implements BlockInterface
      *
      * @return mixed|null
      */
-    public function getCell(int $rowNum, int $cellNum)
+    public function getCellData(int $rowNum, int $cellNum)
     {
         if (isset($this->rows[$rowNum])) {
             $row = $this->rows[$rowNum];
@@ -93,7 +92,7 @@ class Table implements BlockInterface
      *
      * @return array|null
      */
-    public function getCellStyle(int $rowNum, int $cellNum): ?array
+    public function getCellStyleProps(int $rowNum, int $cellNum): ?array
     {
         if (isset($this->rows[$rowNum])) {
             $row = $this->rows[$rowNum];
@@ -112,7 +111,7 @@ class Table implements BlockInterface
     /**
      * @return array
      */
-    public function getStyleOptions(): array
+    public function getStyleProps(): array
     {
         return $this->style;
     }
@@ -120,16 +119,18 @@ class Table implements BlockInterface
     /**
      * @param array $style
      */
-    public function setStyleOptions(array $style): void
+    public function setStyleProps(array $style): void
     {
         $this->style = $style;
     }
 
     /**
+     * @param HtmlOptions|null $options
      * @return string
      */
-    public function toHtml(): string
+    public function toHtml(?HtmlOptions $options = null): string
     {
+        $options = $options ?? Docx::getHtmlOptions();
         $tableStyle = 'border-collapse: collapse;';
         if (!empty($this->style['tblW']['w']) && !empty($this->style['tblW']['type'])) {
             if ($this->style['tblW']['type'] === 'dxa') {
@@ -268,6 +269,8 @@ class Table implements BlockInterface
                         $vAlign = 'middle';
                     }
                     $tdStyle .= ' vertical-align: ' . $vAlign . ';';
+                } else {
+                    $tdStyle .= ' vertical-align: top;';
                 }
                 if (!empty($cellStyle['shd']['fill'])) {
                     $tdStyle .= ' background-color: #' . $cellStyle['shd']['fill'] . ';';
@@ -297,7 +300,7 @@ class Table implements BlockInterface
                             $html .= $cellValue->toHtml();
                         } elseif ($cellValue instanceof BlockInterface) {
                             if (method_exists($cellValue, 'getHtml')) {
-                                $html .= $cellValue->getHtml();
+                                $html .= $cellValue->toHtml();
                             } else {
                                 $html .= htmlspecialchars($cellValue->getText());
                             }
@@ -309,7 +312,7 @@ class Table implements BlockInterface
                     $html .= $cellValues->toHtml();
                 } elseif ($cellValues instanceof BlockInterface) {
                     if (method_exists($cellValues, 'getHtml')) {
-                        $html .= $cellValues->getHtml();
+                        $html .= $cellValues->toHtml();
                     } else {
                         $html .= htmlspecialchars($cellValues->getText());
                     }

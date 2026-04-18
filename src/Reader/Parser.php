@@ -119,10 +119,10 @@ class Parser
                 if ($xmlReader->name === 'w:t') {
                     $text .= $xmlReader->readString();
                 } elseif ($xmlReader->name === 'w:br' || $xmlReader->name === 'w:cr') {
-                    $text .= "\n";
+                    $text = '';
                     $isBreak = true;
                 } elseif ($xmlReader->name === 'w:tab') {
-                    $text .= "\t";
+                    $text = '';
                     $isTab = true;
                 } elseif ($xmlReader->name === 'w:drawing' || $xmlReader->name === 'w:pict') {
                     $isImage = true;

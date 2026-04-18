@@ -2,7 +2,10 @@
 
 namespace avadim\FastDocxReader\Fragments;
 
+use avadim\FastDocxReader\Docx;
 use avadim\FastDocxReader\Interfaces\FragmentInterface;
+use avadim\FastDocxReader\Options\HtmlOptions;
+use avadim\FastDocxReader\Options\PlainTextOptions;
 
 class Text implements FragmentInterface
 {
@@ -49,25 +52,26 @@ class Text implements FragmentInterface
     }
 
     /**
+     * @param PlainTextOptions|null $options
+     *
      * @return string
      */
-    public function getType(): string
+    public function getText(?PlainTextOptions $options = null): string
     {
-        return 'text';
-    }
-
-    /**
-     * @return string
-     */
-    public function getText(): string
-    {
+        $options = $options ?? Docx::getPlainTextOptions();
+        if ($this->isBreak) {
+            return $options->breakChar;
+        }
+        if ($this->isTab) {
+            return $options->tabChar;
+        }
         return $this->text;
     }
 
     /**
      * @return array
      */
-    public function getStyleOptions(): array
+    public function getStyleProps(): array
     {
         return $this->style;
     }
@@ -75,17 +79,19 @@ class Text implements FragmentInterface
     /**
      * @param array $style
      */
-    public function setStyleOptions(array $style): void
+    public function setStyleProps(array $style): void
     {
         $this->style = $style;
     }
 
     /**
-     * @param string $tag
+     * @param HtmlOptions|null $options
      * @return string
      */
-    public function toHtml(string $tag = 'span'): string
+    public function toHtml(?HtmlOptions $options = null): string
     {
+        $options = $options ?? Docx::getHtmlOptions();
+        $tag = 'span';
         $styles = [];
         if (!empty($this->style['b']) || !empty($this->style['bCs'])) {
             $styles[] = 'font-weight:bold';
