@@ -39,14 +39,10 @@ class ParagraphList extends Paragraph
         $text = '';
         foreach ($this->items as $item) {
             if ($item instanceof ParagraphList) {
-                $text .= "\t" . str_replace("\n", "\n\t", trim($item->getText())) . "\n";
+                $text .= "\t" . str_replace("\n", "\n\t", trim($item->getText())) . $options->breakChar;
             } else {
-                $marker = $item->getMarker();
-                if ($marker !== null) {
-                    $text .= $marker . ' ' . $item->getText($options) . "\n";
-                } else {
-                    $text .= $item->getText($options) . "\n";
-                }
+                //$marker = $item->getMarker();
+                $text .= $options->bulletMarker . ' ' . $item->getText($options) . $options->breakChar;
             }
         }
         return $text;

@@ -187,6 +187,12 @@ class Reader extends \XMLReader
         return true;
     }
 
+
+    public function openDocument()
+    {
+        return $this->openZip('word/document.xml');
+    }
+
     /**
      * @return bool
      */

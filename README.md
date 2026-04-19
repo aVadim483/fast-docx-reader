@@ -38,70 +38,10 @@ You can get the full text of the document:
 $text = $doc->getText();
 ```
 
-Or with specific options:
-
-```php
-$text = $doc->getText([
-    'headers' => true,
-    'footers' => true,
-    'tables' => true,
-    'footnotes' => true,
-    'endnotes' => true,
-]);
-```
-
 ### Convert to HTML
 
 ```php
 $html = $doc->toHtml();
-```
-
-### Iterate through blocks
-
-You can iterate through all content blocks (paragraphs and tables) in the document:
-
-```php
-use Avadim\FastDocxReader\Blocks\Paragraph;
-use Avadim\FastDocxReader\Blocks\Table;
-
-foreach ($doc->blocks() as $block) {
-    if ($block instanceof Paragraph) {
-        echo '[Paragraph] ' . $block->getText() . PHP_EOL;
-    } elseif ($block instanceof Table) {
-        echo '[Table]' . PHP_EOL;
-        $rows = $block->getRowsData();
-        foreach ($rows as $row) {
-            // Process row data
-        }
-    }
-}
-```
-
-### Metadata, Headers, and Footers
-
-```php
-// Get metadata
-$metadata = $doc->getMetadata();
-
-// Iterate headers
-foreach ($doc->headers() as $header) {
-    echo $header->getName() . ': ' . $header->getText() . PHP_EOL;
-}
-
-// Iterate footers
-foreach ($doc->footers() as $footer) {
-    echo $footer->getName() . ': ' . $footer->getText() . PHP_EOL;
-}
-```
-
-### Images
-
-```php
-foreach ($doc->images() as $image) {
-    echo "Image: " . $image->getPartName() . ' (' . $image->getContentType() . ')' . PHP_EOL;
-    // Get image binary content
-    // $content = $image->getContent();
-}
 ```
 
 ## Requirements

@@ -165,14 +165,15 @@ class Paragraph implements BlockInterface
         $tag = 'p';
         $html = $this->getHtmlContents();
         if ($tag) {
-            $styles = [];
+            $styles = ['margin:0'];
+
+            $sz = $this->style['rPr']['sz'] ?? 22;
+            $fontSize = ((float)$sz / 2) . 'pt';
+            $styles[] = 'font-size:' . $fontSize;
+            $styles[] = 'min-height:' . $fontSize;
+
             if (!empty($this->style['jc'])) {
                 $styles[] = 'text-align:' . $this->style['jc'];
-            }
-            if (!empty($this->style['rPr']['sz'])) {
-                $fontSize = ((float)$this->style['rPr']['sz'] / 2) . 'pt';
-                $styles[] = 'font-size:' . $fontSize;
-                $styles[] = 'min-height:' . $fontSize;
             }
             if (!empty($this->style['rPr']['b']) || !empty($this->style['rPr']['bCs'])) {
                 $styles[] = 'font-weight:bold';
@@ -188,7 +189,7 @@ class Paragraph implements BlockInterface
                 if (is_array($color) && isset($color['val'])) {
                     $color = $color['val'];
                 }
-                if (is_string($color)) {
+                if (is_string($color) && $color !== 'auto') {
                     $styles[] = 'color:#' . $color;
                 }
             }

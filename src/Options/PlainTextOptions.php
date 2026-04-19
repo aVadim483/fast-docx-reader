@@ -17,5 +17,5 @@ class PlainTextOptions
     public string $bulletMarker = "- ";
 
     public bool $ignoreImages = false;
-    public string $imagePlaceholder = "[Image]";
+    public string $imagePlaceholder = "[[IMAGE]]";
 }

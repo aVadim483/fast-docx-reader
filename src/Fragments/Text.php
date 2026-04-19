@@ -127,10 +127,6 @@ class Text implements FragmentInterface
             return '<' . $tag . $styleStr . '>' . $html . '</' . $tag . '>';
         }
 
-        if ($styleStr) {
-            return '<span' . $styleStr . '>' . $html . '</span>';
-        }
-
         return $html;
     }
 }

@@ -58,9 +58,7 @@ class Docx
         $this->relationshipMap = new RelationshipMap($file);
 
         $this->xmlReader = new Reader($file);
-        $this->xmlReader->openZip('word/document.xml');
-
-        $this->readSectionProps();
+        $this->xmlReader->openDocument();
     }
 
 
@@ -106,6 +104,15 @@ class Docx
     public static function open(string $filePath): self
     {
         return new static($filePath);
+    }
+
+    protected function getXmlReader(): Reader
+    {
+        if (!$this->xmlReader) {
+            $this->xmlReader = new Reader($this->file);
+            $this->xmlReader->openDocument();
+        }
+        return $this->xmlReader;
     }
 
     /**
@@ -320,30 +327,6 @@ class Docx
     }
 
     /**
-     * @param array $cellContent
-     *
-     * @return BlockInterface
-     */
-    protected function composeCell(array $cellContent): BlockInterface
-    {
-        if (count($cellContent) === 1) {
-            return $cellContent[0];
-        }
-
-        $xml = '';
-        foreach ($cellContent as $block) {
-            if ($block instanceof Paragraph) {
-                $xml .= $block->getXml();
-            }
-        }
-
-        $paragraph = new Paragraph($xml);
-        $paragraph->setDocx($this);
-        return $paragraph;
-    }
-
-
-    /**
      * @param string $xml
      * @return array|null
      */
@@ -390,15 +373,21 @@ class Docx
     public function getText(?PlainTextOptions $options = null): string
     {
         $options = $options ?? self::getPlainTextOptions();
+        $this->getXmlReader();
         $fullText = '';
         foreach ($this->blocks() as $block) {
-            $fullText .= $block->getText($options) . $options->blockSeparator;
+            $blockText = $block->getText($options);
+            if ($options->trimBlockText) {
+                $blockText = trim($blockText);
+            }
+            $fullText .= $blockText . $options->blockSeparator;
         }
-        return trim($fullText);
+        return $fullText;
     }
 
     public function toHtml(): string
     {
+        $this->getXmlReader();
         $html = '';
         foreach ($this->blocks() as $block) {
             $html .= $block->toHtml();
@@ -494,6 +483,9 @@ class Docx
      */
     public function getPaperSize(int $sectionNum = 0): ?array
     {
+        if (!isset($this->sectionsProps[$sectionNum])) {
+            $this->readSectionProps();
+        }
         if (isset($this->sectionsProps[$sectionNum]['pgSz'])) {
             $size = $this->sectionsProps[$sectionNum]['pgSz'];
             if (is_array($size)) {
@@ -516,6 +508,9 @@ class Docx
      */
     public function getMargins(int $sectionNum = 0): ?array
     {
+        if (!isset($this->sectionsProps[$sectionNum])) {
+            $this->readSectionProps();
+        }
         if (isset($this->sectionsProps[$sectionNum]['pgMar'])) {
             $margins = $this->sectionsProps[$sectionNum]['pgMar'];
             if (is_array($margins)) {
